@@ -16,6 +16,8 @@ import {IERC165} from
 abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     error Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
     error Error__DepositCollateralFailed();
+    error Error__BorrowAmountExceedsCollateralValue();
+    error Error__BorrowFailed();
 
     IERC20[] private s_tokenAddresses;
     // mapped the price feed and the routers to the addresses correspondly
@@ -43,11 +45,71 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
+    /*
+     * @notice The function helps users to deposit collateral before borrowing or to earn by lending
+     * @param tokenCollateralAddress The addresss of the token user deposit as collateral
+     * @param collateralAmount The amount of the token deposited
+     */
     function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount) external {
         s_deposits[msg.sender][tokenCollateralAddress] += collateralAmount;
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
         if (!success) {
             revert Error__DepositCollateralFailed();
+        }
+    }
+
+    /**
+     * @notice This function helps users to view how much collataral they have on one chain
+     * @return First it returns collateral token
+     * @return The second array returns the amount of each token collateral
+     */
+    function viewMyCollateral() public view returns (address[] memory, uint256[] memory) {
+        uint256 length = s_tokenAddresses.length;
+        address[] memory tokenAddresses = new address[](length);
+        uint256[] memory amounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            tokenAddresses[i] = tokenAddress;
+            amounts[i] = s_deposits[msg.sender][tokenAddress];
+        }
+
+        return (tokenAddresses, amounts);
+    }
+
+    /*
+     * @notice The function allows users to borrow tokens based on their collateral on the same chain
+     * @param tokenBorrowAddress The address of the token the user wants to borrow
+     * @param borrowAmount The amount of the token the user wants to borrow
+     */
+    function borrowOnSameChain(address tokenBorrowAddress, uint256 borrowAmount) external {
+        uint256 totalCollateralValue = 0;
+
+        // Calculate the total collateral value in USD
+        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            uint256 collateralAmount = s_deposits[msg.sender][tokenAddress];
+            if (collateralAmount > 0) {
+                AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[tokenAddress]);
+                (, int256 price,,,) = priceFeed.latestRoundData();
+                uint8 decimals = priceFeed.decimals();
+                totalCollateralValue += uint256(price) * collateralAmount / (10 ** decimals);
+            }
+        }
+
+        uint256 maxBorrowValue = totalCollateralValue / 2; // 50% LTV
+        AggregatorV3Interface borrowPriceFeed = AggregatorV3Interface(s_priceFeeds[tokenBorrowAddress]);
+        (, int256 borrowTokenPrice,,,) = borrowPriceFeed.latestRoundData();
+        uint8 borrowDecimals = borrowPriceFeed.decimals();
+        uint256 borrowValue = uint256(borrowTokenPrice) * borrowAmount / (10 ** borrowDecimals);
+        if (borrowValue > maxBorrowValue) {
+            revert Error__BorrowAmountExceedsCollateralValue();
+        }
+
+        s_borrowings[msg.sender][tokenBorrowAddress] += borrowAmount;
+        bool success = IERC20(tokenBorrowAddress).transfer(msg.sender, borrowAmount);
+        if (!success) {
+            revert Error__BorrowFailed();
         }
     }
 }
