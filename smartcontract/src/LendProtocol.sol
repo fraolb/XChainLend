@@ -15,26 +15,39 @@ import {IERC165} from
 
 abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     error Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
+    error Error__DepositCollateralFailed();
 
-    IRouterClient[] private s_routers;
-    IERC20[] private s_linkTokens;
+    IERC20[] private s_tokenAddresses;
+    // mapped the price feed and the routers to the addresses correspondly
+    mapping(address token => address priceFeed) s_priceFeeds;
+    mapping(address token => IRouterClient router) s_routers;
+
     // Depsitor Address => Deposited Token Address ==> amount
-    mapping(address => mapping(address => uint256)) public deposits;
+    mapping(address => mapping(address => uint256)) public s_deposits;
     // Depsitor Address => Borrowed Token Address ==> amount
-    mapping(address => mapping(address => uint256)) public borrowings;
+    mapping(address => mapping(address => uint256)) public s_borrowings;
 
     /*
      * @notice The constructor takes the router addresses and the tokens that are transferrable
      * @param _routers takes the addresses of router contracts
      * @param _tokens is the tokens that users lend and borrow
      */
-    constructor(address[] memory _routers, address[] memory _tokens) {
-        if (_routers.length != _tokens.length) {
+    constructor(address[] memory _routers, address[] memory _tokenAddresses, address[] memory priceFeedAddresses) {
+        if (_routers.length != _tokenAddresses.length || _tokenAddresses.length != priceFeedAddresses.length) {
             revert Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
         }
         for (uint256 i = 0; i < _routers.length; i++) {
-            s_linkTokens.push(IERC20(_tokens[i]));
-            s_routers.push(IRouterClient(_routers[i]));
+            s_priceFeeds[_tokenAddresses[i]] = priceFeedAddresses[i];
+            s_tokenAddresses.push(IERC20(_tokenAddresses[i]));
+            s_routers[_tokenAddresses[i]] = IRouterClient(_routers[i]);
+        }
+    }
+
+    function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount) external {
+        s_deposits[msg.sender][tokenCollateralAddress] += collateralAmount;
+        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
+        if (!success) {
+            revert Error__DepositCollateralFailed();
         }
     }
 }
