@@ -12,7 +12,7 @@ import {IERC20} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
-import "./Math.sol";
+import "./library/Math.sol";
 
 abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     using Math for uint256;
@@ -62,7 +62,7 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     mapping(address => mapping(address => uint256)) public s_borrowings;
 
     ///////////////////////
-    //// Mofifiers ///////
+    //// Modifiers ///////
     /////////////////////
     modifier amountMoreThanZero(uint256 amount) {
         if (amount == 0) {
