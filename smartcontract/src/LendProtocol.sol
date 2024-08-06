@@ -14,7 +14,7 @@ import {IERC165} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import "./library/Math.sol";
 
-abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
+contract LendProtocol is OwnerIsCreator {
     using Math for uint256;
 
     error Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
@@ -53,6 +53,8 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     // mapped the price feed and the routers to the addresses correspondly
     mapping(address token => address priceFeed) s_priceFeeds;
     mapping(address token => IRouterClient router) s_routers;
+    IRouterClient router;
+    uint256 chainSelector;
 
     // Collateral Deposit Address => Deposited Token Address ==> amount
     mapping(address => mapping(address => uint256)) public s_collateralDeposit;
@@ -83,15 +85,22 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
      * @param _routers takes the addresses of router contracts
      * @param _tokens is the tokens that users lend and borrow
      */
-    constructor(address[] memory _routers, address[] memory _tokenAddresses, address[] memory priceFeedAddresses) {
-        if (_routers.length != _tokenAddresses.length || _tokenAddresses.length != priceFeedAddresses.length) {
+    constructor(
+        address _router,
+        uint256 _chainSelector,
+        address[] memory _tokenAddresses,
+        address[] memory priceFeedAddresses
+    ) {
+        if (_tokenAddresses.length != priceFeedAddresses.length) {
             revert Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
         }
-        for (uint256 i = 0; i < _routers.length; i++) {
+        for (uint256 i = 0; i < _tokenAddresses.length; i++) {
             s_priceFeeds[_tokenAddresses[i]] = priceFeedAddresses[i];
             s_tokenAddresses.push(IERC20(_tokenAddresses[i]));
-            s_routers[_tokenAddresses[i]] = IRouterClient(_routers[i]);
+            //s_routers[_tokenAddresses[i]] = IRouterClient(_routers[i]);
+            router = IRouterClient(_router);
         }
+        chainSelector = _chainSelector;
     }
 
     /**
@@ -115,6 +124,15 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         if (!success) {
             revert Error__DepositLendFailed();
         }
+    }
+
+    function getTokenData(address tokenAddress)
+        public
+        view
+        returns (uint256 totalLiquidity, uint256 totalBorrowed, uint256 totalInterestAccrued)
+    {
+        TokenData memory data = s_tokenData[tokenAddress];
+        return (data.totalLiquidity, data.totalBorrowed, data.totalInterestAccrued);
     }
 
     /**
