@@ -22,6 +22,8 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     error Error__DepositLendFailed();
     error Error__BorrowAmountExceedsCollateralValue();
     error Error__BorrowFailed();
+    error Error__NeedsMoreThanZero();
+    error Error__NotAllowedToken();
 
     struct LenderInfo {
         uint256 amount;
@@ -59,6 +61,23 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     // Depsitor Address => Borrowed Token Address ==> amount
     mapping(address => mapping(address => uint256)) public s_borrowings;
 
+    ///////////////////////
+    //// Mofifiers ///////
+    /////////////////////
+    modifier amountMoreThanZero(uint256 amount) {
+        if (amount == 0) {
+            revert Error__NeedsMoreThanZero();
+        }
+        _;
+    }
+
+    modifier isTokenAllowed(address token) {
+        if (s_priceFeeds[token] == address(0)) {
+            revert Error__NotAllowedToken();
+        }
+        _;
+    }
+
     /*
      * @notice The constructor takes the router addresses and the tokens that are transferrable
      * @param _routers takes the addresses of router contracts
@@ -75,8 +94,16 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
-    // Function to lend tokens
-    function lendToken(address tokenAddress, uint256 amount) external {
+    /**
+     * @notice This function is for anyone to lend tokens that are listed
+     * @param tokenAddress is the token address of the token to be lend
+     * @param amount the amount of token to be lend
+     */
+    function lendToken(address tokenAddress, uint256 amount)
+        external
+        isTokenAllowed(tokenAddress)
+        amountMoreThanZero(amount)
+    {
         LenderInfo storage info = s_lenderInfo[msg.sender][tokenAddress];
         info.amount += amount;
         info.timestamp = block.timestamp;
@@ -95,7 +122,11 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
      * @param tokenCollateralAddress The addresss of the token user deposit as collateral
      * @param collateralAmount The amount of the token deposited
      */
-    function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount) external {
+    function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount)
+        external
+        isTokenAllowed(tokenCollateralAddress)
+        amountMoreThanZero(collateralAmount)
+    {
         s_collateralDeposit[msg.sender][tokenCollateralAddress] += collateralAmount;
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
         if (!success) {
