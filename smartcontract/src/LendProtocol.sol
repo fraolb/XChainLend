@@ -12,12 +12,40 @@ import {IERC20} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import "./Math.sol";
 
 abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
+    using Math for uint256;
+
     error Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
     error Error__DepositCollateralFailed();
+    error Error__DepositLendFailed();
     error Error__BorrowAmountExceedsCollateralValue();
     error Error__BorrowFailed();
+
+    struct LenderInfo {
+        uint256 amount;
+        uint256 timestamp;
+        uint256 interestAccrued;
+    }
+
+    struct TokenData {
+        uint256 totalLiquidity;
+        uint256 totalBorrowed;
+        uint256 totalInterestAccrued;
+    }
+
+    struct BorrowInfo {
+        uint256 amount;
+        uint256 collateralAmount;
+        uint256 timestamp;
+    }
+
+    mapping(address => mapping(address => LenderInfo)) public s_lenderInfo; // Lender => Token => Info
+    mapping(address => TokenData) public s_tokenData; // Token => Data
+    mapping(address => mapping(address => BorrowInfo)) public s_borrowInfo; // Borrower => Token => Info
+
+    uint256 public annualInterestRate; // Annual interest rate in basis points
 
     IERC20[] private s_tokenAddresses;
     // mapped the price feed and the routers to the addresses correspondly
@@ -47,6 +75,21 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
+    // Function to lend tokens
+    function lendToken(address tokenAddress, uint256 amount) external {
+        LenderInfo storage info = s_lenderInfo[msg.sender][tokenAddress];
+        info.amount += amount;
+        info.timestamp = block.timestamp;
+
+        TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
+        tokenDataInfo.totalLiquidity += amount;
+
+        bool success = IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
+        if (!success) {
+            revert Error__DepositLendFailed();
+        }
+    }
+
     /**
      * @notice The function helps users to deposit collateral before borrowing or to earn by lending
      * @param tokenCollateralAddress The addresss of the token user deposit as collateral
@@ -58,6 +101,20 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         if (!success) {
             revert Error__DepositCollateralFailed();
         }
+    }
+
+    // Function to borrow tokens
+    function borrowToken(address tokenAddress, uint256 amount, uint256 collateralAmount) external {
+        // Over-collateralization check and transfer collateral logic here
+        BorrowInfo storage info = s_borrowInfo[msg.sender][tokenAddress];
+        info.amount += amount;
+        info.collateralAmount += collateralAmount;
+        info.timestamp = block.timestamp;
+
+        TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
+        tokenDataInfo.totalBorrowed += amount;
+
+        IERC20(tokenAddress).transfer(msg.sender, amount);
     }
 
     /**
