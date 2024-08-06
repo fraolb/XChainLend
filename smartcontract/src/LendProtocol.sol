@@ -24,6 +24,8 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     mapping(address token => address priceFeed) s_priceFeeds;
     mapping(address token => IRouterClient router) s_routers;
 
+    // Collateral Deposit Address => Deposited Token Address ==> amount
+    mapping(address => mapping(address => uint256)) public s_collateralDeposit;
     // Depsitor Address => Deposited Token Address ==> amount
     mapping(address => mapping(address => uint256)) public s_deposits;
     // Depsitor Address => Borrowed Token Address ==> amount
@@ -45,13 +47,13 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
-    /*
+    /**
      * @notice The function helps users to deposit collateral before borrowing or to earn by lending
      * @param tokenCollateralAddress The addresss of the token user deposit as collateral
      * @param collateralAmount The amount of the token deposited
      */
     function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount) external {
-        s_deposits[msg.sender][tokenCollateralAddress] += collateralAmount;
+        s_collateralDeposit[msg.sender][tokenCollateralAddress] += collateralAmount;
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
         if (!success) {
             revert Error__DepositCollateralFailed();
@@ -77,7 +79,7 @@ abstract contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         return (tokenAddresses, amounts);
     }
 
-    /*
+    /**
      * @notice The function allows users to borrow tokens based on their collateral on the same chain
      * @param tokenBorrowAddress The address of the token the user wants to borrow
      * @param borrowAmount The amount of the token the user wants to borrow
