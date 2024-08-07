@@ -123,26 +123,47 @@ contract LendProtocolTest is Test {
         vm.startPrank(USER);
         ERC20Mock(tokens[0]).approve(address(lendProtocol), 100 ether);
         ERC20Mock(tokens[1]).approve(address(lendProtocol), 100 ether);
-        lendProtocol.depositCollateral(tokens[0], 10 ether);
+        lendProtocol.depositCollateral(tokens[1], 10 ether);
 
         // Check the collateral amount
         (, uint256[] memory amounts) = lendProtocol.getCollateralAmount();
-        assertEq(amounts[0], AMOUNT_COLLATERAL);
+        assertEq(amounts[1], AMOUNT_COLLATERAL);
 
         // User borrows token
-        lendProtocol.borrowOnSameChain(tokens[1], 1 ether);
+        lendProtocol.borrowOnSameChain(tokens[0], 1 ether);
 
         // Verify the borrowing
         (uint256 totalLiquidity, uint256 totalBorrowed, uint256 totalInterestAccrued) =
-            lendProtocol.getTokenData(tokens[1]);
+            lendProtocol.getTokenData(tokens[0]);
+        console.log("the total liq ", totalLiquidity);
+        console.log("the total borrowed  ", totalBorrowed);
+
         assertEq(totalBorrowed, 1 ether);
 
         // Verify user's borrow data
         LendProtocol.BorrowInfo[] memory borrowInfo = lendProtocol.getBorrowData();
         assertEq(borrowInfo.length, 1);
-        assertEq(borrowInfo[0].borrowedToken, tokens[1]);
+        assertEq(borrowInfo[0].borrowedToken, tokens[0]);
         assertEq(borrowInfo[0].amount, 1 ether);
 
         vm.stopPrank();
+    }
+
+    function testGetUsdValue() public {
+        uint256 MOCK_PRICE = 2000 * 10 ** 8; // Mock price of 2000 USD with 8 decimals
+        uint8 DECIMALS = 8;
+        uint256 amount = 1 ether; // 1 token with 18 decimals
+
+        // Call getUsdValue function
+        uint256 usdValue = lendProtocol.getUsdValue(tokenPriceFeeds[1], amount);
+
+        // Calculate the expected USD value
+        uint256 expectedUsdValue = (MOCK_PRICE * amount) / (10 ** DECIMALS);
+
+        console.log("the expected val is ", expectedUsdValue);
+        console.log("the value is ", usdValue);
+
+        // Assert that the returned value is equal to the expected value
+        assertEq(usdValue, expectedUsdValue);
     }
 }

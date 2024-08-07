@@ -212,23 +212,25 @@ contract LendProtocol is OwnerIsCreator {
             address tokenAddress = address(s_tokenAddresses[i]);
             uint256 collateralAmount = s_collateralInfo[msg.sender][tokenAddress].collateralAmount;
             if (collateralAmount > 0) {
-                AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[tokenAddress]);
-                (, int256 price,,,) = priceFeed.latestRoundData();
-                uint8 decimals = priceFeed.decimals();
-                totalCollateralValue += uint256(price) * collateralAmount / (10 ** decimals);
+                uint256 amount = getUsdValue(s_priceFeeds[tokenAddress], collateralAmount);
+
+                totalCollateralValue += amount;
             }
         }
 
         uint256 maxBorrowValue = totalCollateralValue / 2; // 50% LTV
-        AggregatorV3Interface borrowPriceFeed = AggregatorV3Interface(s_priceFeeds[tokenBorrowAddress]);
-        (, int256 borrowTokenPrice,,,) = borrowPriceFeed.latestRoundData();
-        uint8 borrowDecimals = borrowPriceFeed.decimals();
-        uint256 borrowValue = uint256(borrowTokenPrice) * borrowAmount / (10 ** borrowDecimals);
-        if (borrowValue > maxBorrowValue) {
+
+        uint256 amountToBeBorrowedInUsd = getUsdValue(s_priceFeeds[tokenBorrowAddress], borrowAmount);
+        if (amountToBeBorrowedInUsd > maxBorrowValue) {
             revert Error__BorrowAmountExceedsCollateralValue();
         }
 
+        TokenData storage tokenDataInfo = s_tokenData[tokenBorrowAddress];
+        tokenDataInfo.totalLiquidity -= borrowAmount;
+        tokenDataInfo.totalBorrowed += borrowAmount;
+
         s_borrowInfo[msg.sender][tokenBorrowAddress].amount += borrowAmount;
+        s_borrowInfo[msg.sender][tokenBorrowAddress].borrowedToken = tokenBorrowAddress;
         bool success = IERC20(tokenBorrowAddress).transfer(msg.sender, borrowAmount);
         if (!success) {
             revert Error__BorrowFailed();
@@ -259,5 +261,12 @@ contract LendProtocol is OwnerIsCreator {
         }
 
         return borrowInfo;
+    }
+
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(token);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+        uint8 decimals = priceFeed.decimals();
+        return (uint256(price) * amount) / (10 ** decimals);
     }
 }
