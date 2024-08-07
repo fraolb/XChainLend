@@ -149,7 +149,7 @@ contract LendProtocolTest is Test {
         vm.stopPrank();
     }
 
-    function testGetUsdValue() public {
+    function testGetUsdValue() public view {
         uint256 MOCK_PRICE = 2000 * 10 ** 8; // Mock price of 2000 USD with 8 decimals
         uint8 DECIMALS = 8;
         uint256 amount = 1 ether; // 1 token with 18 decimals

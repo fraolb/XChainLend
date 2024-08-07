@@ -24,6 +24,11 @@ contract LendProtocol is OwnerIsCreator {
     error Error__BorrowFailed();
     error Error__NeedsMoreThanZero();
     error Error__NotAllowedToken();
+    error Error__NoLendMoneyFound();
+    error Error__RequestAmountExceedsLendAmount();
+    error Error__WithdrawLendFailed();
+    error Error__BorrowAmountExceedsLiquidity();
+    error Error__PaybackBorrowFailed();
 
     struct LenderInfo {
         uint256 amount;
@@ -226,6 +231,9 @@ contract LendProtocol is OwnerIsCreator {
         }
 
         TokenData storage tokenDataInfo = s_tokenData[tokenBorrowAddress];
+        if (borrowAmount > tokenDataInfo.totalLiquidity) {
+            revert Error__BorrowAmountExceedsLiquidity();
+        }
         tokenDataInfo.totalLiquidity -= borrowAmount;
         tokenDataInfo.totalBorrowed += borrowAmount;
 
@@ -268,5 +276,43 @@ contract LendProtocol is OwnerIsCreator {
         (, int256 price,,,) = priceFeed.latestRoundData();
         uint8 decimals = priceFeed.decimals();
         return (uint256(price) * amount) / (10 ** decimals);
+    }
+
+    function withdrawLendToken(address tokenAddress, uint256 amountToBeWithdrawn)
+        external
+        isTokenAllowed(tokenAddress)
+        amountMoreThanZero(amountToBeWithdrawn)
+    {
+        LenderInfo memory lender = s_lenderInfo[msg.sender][tokenAddress];
+        if (lender.amount == 0) {
+            revert Error__NoLendMoneyFound();
+        }
+        if (lender.amount < amountToBeWithdrawn) {
+            revert Error__RequestAmountExceedsLendAmount();
+        }
+        lender.amount -= amountToBeWithdrawn;
+        TokenData memory token = s_tokenData[tokenAddress];
+        token.totalLiquidity -= amountToBeWithdrawn;
+        bool success = IERC20(tokenAddress).transfer(msg.sender, amountToBeWithdrawn);
+        if (!success) {
+            revert Error__WithdrawLendFailed();
+        }
+    }
+
+    function paybackBorrowedToken(address tokenAddress, uint256 amountToBePaid)
+        external
+        isTokenAllowed(tokenAddress)
+        amountMoreThanZero(amountToBePaid)
+    {
+        BorrowInfo memory borrowedInfo = s_borrowInfo[msg.sender][tokenAddress];
+
+        borrowedInfo.amount -= amountToBePaid;
+        TokenData memory token = s_tokenData[tokenAddress];
+        token.totalLiquidity += amountToBePaid;
+        token.totalBorrowed -= amountToBePaid;
+        bool success = IERC20(tokenAddress).transferFrom(msg.sender, address(this), amountToBePaid);
+        if (!success) {
+            revert Error__PaybackBorrowFailed();
+        }
     }
 }
