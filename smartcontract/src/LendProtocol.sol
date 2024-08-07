@@ -27,6 +27,7 @@ contract LendProtocol is OwnerIsCreator {
 
     struct LenderInfo {
         uint256 amount;
+        address lendToken;
         uint256 timestamp;
         uint256 interestAccrued;
     }
@@ -39,13 +40,21 @@ contract LendProtocol is OwnerIsCreator {
 
     struct BorrowInfo {
         uint256 amount;
-        uint256 collateralAmount;
+        address borrowedToken;
+        bool onTheSameChain;
         uint256 timestamp;
+    }
+
+    struct CollateralInfo {
+        uint256 timestamp;
+        address collateralToken;
+        uint256 collateralAmount;
     }
 
     mapping(address => mapping(address => LenderInfo)) public s_lenderInfo; // Lender => Token => Info
     mapping(address => TokenData) public s_tokenData; // Token => Data
     mapping(address => mapping(address => BorrowInfo)) public s_borrowInfo; // Borrower => Token => Info
+    mapping(address => mapping(address => CollateralInfo)) public s_collateralInfo; // Borrower collateral => Token => Info
 
     uint256 public annualInterestRate; // Annual interest rate in basis points
 
@@ -57,11 +66,11 @@ contract LendProtocol is OwnerIsCreator {
     uint256 chainSelector;
 
     // Collateral Deposit Address => Deposited Token Address ==> amount
-    mapping(address => mapping(address => uint256)) public s_collateralDeposit;
+    // mapping(address => mapping(address => uint256)) public s_collateralDeposit;
     // Depsitor Address => Deposited Token Address ==> amount
-    mapping(address => mapping(address => uint256)) public s_deposits;
+    //mapping(address => mapping(address => uint256)) public s_deposits;
     // Depsitor Address => Borrowed Token Address ==> amount
-    mapping(address => mapping(address => uint256)) public s_borrowings;
+    //mapping(address => mapping(address => uint256)) public s_borrowings;
 
     ///////////////////////
     //// Modifiers ///////
@@ -115,6 +124,7 @@ contract LendProtocol is OwnerIsCreator {
     {
         LenderInfo storage info = s_lenderInfo[msg.sender][tokenAddress];
         info.amount += amount;
+        info.lendToken = tokenAddress;
         info.timestamp = block.timestamp;
 
         TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
@@ -145,7 +155,11 @@ contract LendProtocol is OwnerIsCreator {
         isTokenAllowed(tokenCollateralAddress)
         amountMoreThanZero(collateralAmount)
     {
-        s_collateralDeposit[msg.sender][tokenCollateralAddress] += collateralAmount;
+        CollateralInfo storage info = s_collateralInfo[msg.sender][tokenCollateralAddress];
+        info.collateralToken = tokenCollateralAddress;
+        info.collateralAmount = collateralAmount;
+        info.timestamp = block.timestamp;
+        // s_collateralDeposit[msg.sender][tokenCollateralAddress] += collateralAmount;
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
         if (!success) {
             revert Error__DepositCollateralFailed();
@@ -157,7 +171,7 @@ contract LendProtocol is OwnerIsCreator {
         // Over-collateralization check and transfer collateral logic here
         BorrowInfo storage info = s_borrowInfo[msg.sender][tokenAddress];
         info.amount += amount;
-        info.collateralAmount += collateralAmount;
+        //info.collateralAmount += collateralAmount;
         info.timestamp = block.timestamp;
 
         TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
@@ -171,7 +185,7 @@ contract LendProtocol is OwnerIsCreator {
      * @return First it returns collateral token
      * @return The second array returns the amount of each token collateral
      */
-    function viewMyCollateral() public view returns (address[] memory, uint256[] memory) {
+    function getCollateralAmount() public view returns (address[] memory, uint256[] memory) {
         uint256 length = s_tokenAddresses.length;
         address[] memory tokenAddresses = new address[](length);
         uint256[] memory amounts = new uint256[](length);
@@ -179,7 +193,7 @@ contract LendProtocol is OwnerIsCreator {
         for (uint256 i = 0; i < length; i++) {
             address tokenAddress = address(s_tokenAddresses[i]);
             tokenAddresses[i] = tokenAddress;
-            amounts[i] = s_deposits[msg.sender][tokenAddress];
+            amounts[i] = s_collateralInfo[msg.sender][tokenAddress].collateralAmount;
         }
 
         return (tokenAddresses, amounts);
@@ -196,7 +210,7 @@ contract LendProtocol is OwnerIsCreator {
         // Calculate the total collateral value in USD
         for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
             address tokenAddress = address(s_tokenAddresses[i]);
-            uint256 collateralAmount = s_deposits[msg.sender][tokenAddress];
+            uint256 collateralAmount = s_collateralInfo[msg.sender][tokenAddress].collateralAmount;
             if (collateralAmount > 0) {
                 AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[tokenAddress]);
                 (, int256 price,,,) = priceFeed.latestRoundData();
@@ -214,10 +228,36 @@ contract LendProtocol is OwnerIsCreator {
             revert Error__BorrowAmountExceedsCollateralValue();
         }
 
-        s_borrowings[msg.sender][tokenBorrowAddress] += borrowAmount;
+        s_borrowInfo[msg.sender][tokenBorrowAddress].amount += borrowAmount;
         bool success = IERC20(tokenBorrowAddress).transfer(msg.sender, borrowAmount);
         if (!success) {
             revert Error__BorrowFailed();
         }
+    }
+
+    function getBorrowData() public view returns (BorrowInfo[] memory) {
+        // Calculate the length of the borrower's active borrowings
+        uint256 borrowCount = 0;
+        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            uint256 borrowAmount = s_borrowInfo[msg.sender][tokenAddress].amount;
+            if (borrowAmount > 0) {
+                borrowCount++;
+            }
+        }
+
+        // Create a dynamic array in memory to store active borrowings
+        BorrowInfo[] memory borrowInfo = new BorrowInfo[](borrowCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            BorrowInfo memory borrow = s_borrowInfo[msg.sender][tokenAddress];
+            if (borrow.amount > 0) {
+                borrowInfo[index] = borrow;
+                index++;
+            }
+        }
+
+        return borrowInfo;
     }
 }
