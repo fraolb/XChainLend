@@ -167,6 +167,32 @@ contract LendProtocolTest is Test {
         assertEq(usdValue, expectedUsdValue);
     }
 
+    /// test withdraw lend function
+    function testWithdrawLendToken() public {
+        // Mint some mock tokens for the user
+        ERC20Mock(tokens[0]).mint(USER, 100 ether);
+
+        // User lends token
+        vm.startPrank(USER);
+        ERC20Mock(tokens[0]).approve(address(lendProtocol), 100 ether);
+
+        lendProtocol.lendToken(tokens[0], 50 ether);
+
+        // User withdraws lend token
+        lendProtocol.withdrawLendToken(tokens[0], 20 ether);
+
+        // Check user's lend data
+        (uint256 amount, address lendToken, uint256 timestamp, uint256 interestAccrued) =
+            lendProtocol.getLenderTokenData(tokens[0]);
+        assertEq(amount, 30 ether);
+
+        // Check the token data
+        (uint256 totalLiquidity, uint256 totalBorrowed, uint256 totalInterestAccrued) =
+            lendProtocol.getTokenData(tokens[0]);
+        assertEq(totalLiquidity, 30 ether);
+        assertEq(totalBorrowed, 0 ether);
+    }
+
     /// test re pay the borrow function
     function testPaybackBorrowedToken() public depositedLend {
         // Mint some mock tokens for the user

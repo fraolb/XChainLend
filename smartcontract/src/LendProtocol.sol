@@ -150,6 +150,15 @@ contract LendProtocol is OwnerIsCreator {
         return (data.totalLiquidity, data.totalBorrowed, data.totalInterestAccrued);
     }
 
+    function getLenderTokenData(address tokenAddress)
+        public
+        view
+        returns (uint256 amount, address lendToken, uint256 timestamp, uint256 interestAccrued)
+    {
+        LenderInfo memory data = s_lenderInfo[msg.sender][tokenAddress];
+        return (data.amount, data.lendToken, data.timestamp, data.interestAccrued);
+    }
+
     /**
      * @notice The function helps users to deposit collateral before borrowing or to earn by lending
      * @param tokenCollateralAddress The addresss of the token user deposit as collateral
@@ -283,7 +292,7 @@ contract LendProtocol is OwnerIsCreator {
         isTokenAllowed(tokenAddress)
         amountMoreThanZero(amountToBeWithdrawn)
     {
-        LenderInfo memory lender = s_lenderInfo[msg.sender][tokenAddress];
+        LenderInfo storage lender = s_lenderInfo[msg.sender][tokenAddress];
         if (lender.amount == 0) {
             revert Error__NoLendMoneyFound();
         }
@@ -291,7 +300,7 @@ contract LendProtocol is OwnerIsCreator {
             revert Error__RequestAmountExceedsLendAmount();
         }
         lender.amount -= amountToBeWithdrawn;
-        TokenData memory token = s_tokenData[tokenAddress];
+        TokenData storage token = s_tokenData[tokenAddress];
         token.totalLiquidity -= amountToBeWithdrawn;
         bool success = IERC20(tokenAddress).transfer(msg.sender, amountToBeWithdrawn);
         if (!success) {
