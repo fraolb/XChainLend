@@ -166,4 +166,36 @@ contract LendProtocolTest is Test {
         // Assert that the returned value is equal to the expected value
         assertEq(usdValue, expectedUsdValue);
     }
+
+    /// test re pay the borrow function
+    function testPaybackBorrowedToken() public depositedLend {
+        // Mint some mock tokens for the user
+        ERC20Mock(tokens[0]).mint(USER, 100 ether);
+        ERC20Mock(tokens[1]).mint(USER, 100 ether);
+
+        // User deposits collateral
+        vm.startPrank(USER);
+        ERC20Mock(tokens[0]).approve(address(lendProtocol), 100 ether);
+        ERC20Mock(tokens[1]).approve(address(lendProtocol), 100 ether);
+        lendProtocol.depositCollateral(tokens[1], 10 ether);
+
+        // User borrows token
+        lendProtocol.borrowOnSameChain(tokens[0], 2 ether);
+
+        // User repays back the token
+        lendProtocol.paybackBorrowedToken(tokens[0], 1 ether);
+
+        // Check user's borrowed data
+        LendProtocol.BorrowInfo[] memory borrowInfo = lendProtocol.getBorrowData();
+        assertEq(borrowInfo.length, 1);
+        assertEq(borrowInfo[0].borrowedToken, tokens[0]);
+        assertEq(borrowInfo[0].amount, 1 ether);
+
+        // Check the token data
+        // Verify the borrowing
+        (uint256 totalLiquidity, uint256 totalBorrowed, uint256 totalInterestAccrued) =
+            lendProtocol.getTokenData(tokens[0]);
+        assertEq(totalLiquidity, 49 ether); // Since 2 ether borrowed and 1 ether repaid, and 50 ether is in the lend
+        assertEq(totalBorrowed, 1 ether); // Since 2 ether borrowed and 1 ether repaid
+    }
 }

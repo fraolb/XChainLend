@@ -65,8 +65,8 @@ contract LendProtocol is OwnerIsCreator {
 
     IERC20[] private s_tokenAddresses;
     // mapped the price feed and the routers to the addresses correspondly
-    mapping(address token => address priceFeed) s_priceFeeds;
-    mapping(address token => IRouterClient router) s_routers;
+    mapping(address => address) s_priceFeeds;
+    mapping(address => IRouterClient) s_routers;
     IRouterClient router;
     uint256 chainSelector;
 
@@ -304,10 +304,10 @@ contract LendProtocol is OwnerIsCreator {
         isTokenAllowed(tokenAddress)
         amountMoreThanZero(amountToBePaid)
     {
-        BorrowInfo memory borrowedInfo = s_borrowInfo[msg.sender][tokenAddress];
+        BorrowInfo storage borrowedInfo = s_borrowInfo[msg.sender][tokenAddress];
 
         borrowedInfo.amount -= amountToBePaid;
-        TokenData memory token = s_tokenData[tokenAddress];
+        TokenData storage token = s_tokenData[tokenAddress];
         token.totalLiquidity += amountToBePaid;
         token.totalBorrowed -= amountToBePaid;
         bool success = IERC20(tokenAddress).transferFrom(msg.sender, address(this), amountToBePaid);
