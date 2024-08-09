@@ -6,9 +6,8 @@ import { ThirdwebProvider } from "thirdweb/react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "thirdweb SDK + Next starter",
-  description:
-    "Starter template for using thirdweb SDK with Next.js App router",
+  title: "XChain Lend",
+  description: "A crosschain lending and borrowing platform",
 };
 
 export default function RootLayout({
