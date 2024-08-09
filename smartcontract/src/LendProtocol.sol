@@ -164,24 +164,6 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
-    function getTokenData(address tokenAddress)
-        public
-        view
-        returns (uint256 totalLiquidity, uint256 totalBorrowed, uint256 totalInterestAccrued)
-    {
-        TokenData memory data = s_tokenData[tokenAddress];
-        return (data.totalLiquidity, data.totalBorrowed, data.totalInterestAccrued);
-    }
-
-    function getLenderTokenData(address tokenAddress)
-        public
-        view
-        returns (uint256 amount, address lendToken, uint256 timestamp, uint256 interestAccrued)
-    {
-        LenderInfo memory data = s_lenderInfo[msg.sender][tokenAddress];
-        return (data.amount, data.lendToken, data.timestamp, data.interestAccrued);
-    }
-
     /**
      * @notice The function helps users to deposit collateral before borrowing or to earn by lending
      * @param tokenCollateralAddress The addresss of the token user deposit as collateral
@@ -261,39 +243,6 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         if (!success) {
             revert Error__BorrowFailed();
         }
-    }
-
-    function getBorrowData() public view returns (BorrowInfo[] memory) {
-        // Calculate the length of the borrower's active borrowings
-        uint256 borrowCount = 0;
-        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
-            address tokenAddress = address(s_tokenAddresses[i]);
-            uint256 borrowAmount = s_borrowInfo[msg.sender][tokenAddress].amount;
-            if (borrowAmount > 0) {
-                borrowCount++;
-            }
-        }
-
-        // Create a dynamic array in memory to store active borrowings
-        BorrowInfo[] memory borrowInfo = new BorrowInfo[](borrowCount);
-        uint256 index = 0;
-        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
-            address tokenAddress = address(s_tokenAddresses[i]);
-            BorrowInfo memory borrow = s_borrowInfo[msg.sender][tokenAddress];
-            if (borrow.amount > 0) {
-                borrowInfo[index] = borrow;
-                index++;
-            }
-        }
-
-        return borrowInfo;
-    }
-
-    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(token);
-        (, int256 price,,,) = priceFeed.latestRoundData();
-        uint8 decimals = priceFeed.decimals();
-        return (uint256(price) * amount) / (10 ** decimals);
     }
 
     function withdrawLendToken(address tokenAddress, uint256 amountToBeWithdrawn)
@@ -390,5 +339,78 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     /// @return text The last received text.
     function getLastReceivedMessageDetails() external view returns (bytes32 messageId, string memory text) {
         return (s_lastReceivedMessageId, s_lastReceivedText);
+    }
+
+    /////////////////////////////
+    //// view            ///////
+    ////////////////////////////
+
+    /**
+     * @notice This function returns how much user lend a token
+     */
+    function getLenderTokenData(address tokenAddress)
+        public
+        view
+        returns (uint256 amount, address lendToken, uint256 timestamp, uint256 interestAccrued)
+    {
+        LenderInfo memory data = s_lenderInfo[msg.sender][tokenAddress];
+        return (data.amount, data.lendToken, data.timestamp, data.interestAccrued);
+    }
+
+    /**
+     * @notice This functino returns the users borrow data, how much they borrowed
+     */
+    function getBorrowData() public view returns (BorrowInfo[] memory) {
+        // Calculate the length of the borrower's active borrowings
+        uint256 borrowCount = 0;
+        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            uint256 borrowAmount = s_borrowInfo[msg.sender][tokenAddress].amount;
+            if (borrowAmount > 0) {
+                borrowCount++;
+            }
+        }
+
+        // Create a dynamic array in memory to store active borrowings
+        BorrowInfo[] memory borrowInfo = new BorrowInfo[](borrowCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < s_tokenAddresses.length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            BorrowInfo memory borrow = s_borrowInfo[msg.sender][tokenAddress];
+            if (borrow.amount > 0) {
+                borrowInfo[index] = borrow;
+                index++;
+            }
+        }
+
+        return borrowInfo;
+    }
+
+    /**
+     * @notice This function helps to get the usd value of a token
+     * @param token The token wanted to get the value of
+     * @param amount The amount of the token
+     */
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(token);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+        uint8 decimals = priceFeed.decimals();
+        return (uint256(price) * amount) / (10 ** decimals);
+    }
+
+    /**
+     * @notice This function give info about token
+     * @param tokenAddress is the token requied to get data of
+     * @return totalLiquidity the total liquidity of the token
+     * @return totalBorrowed the total borrowed amount of the token
+     * @return totalInterestAccrued the total interest the lender get for supplying the token
+     */
+    function getTokenData(address tokenAddress)
+        public
+        view
+        returns (uint256 totalLiquidity, uint256 totalBorrowed, uint256 totalInterestAccrued)
+    {
+        TokenData memory data = s_tokenData[tokenAddress];
+        return (data.totalLiquidity, data.totalBorrowed, data.totalInterestAccrued);
     }
 }
