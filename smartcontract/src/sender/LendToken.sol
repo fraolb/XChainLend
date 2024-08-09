@@ -1,4 +1,4 @@
-import "./interfaces/sendToProtocol.sol";
+import "../interfaces/sendToProtocol.sol";
 
 abstract contract lendToken is sendToProtocol {
     // Implement the interface functions here
