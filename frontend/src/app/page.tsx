@@ -4,10 +4,11 @@ import thirdwebIcon from "@public/thirdweb.svg";
 import { client } from "./client";
 import Layout from "@/components/Layout";
 import LendBorrow from "@/components/LendBorrow";
+import Logo from "@public/Xchain logo.png";
 
 export default function Home() {
   return (
-    <main className="p-4 pb-10 min-h-[100vh] flex items-center justify-center container max-w-screen-lg mx-auto">
+    <main>
       <Layout>
         <LendBorrow />
       </Layout>
