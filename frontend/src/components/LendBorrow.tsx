@@ -109,6 +109,7 @@ const LendBorrow = () => {
           <thead>
             <tr>
               <th className="py-2 px-4 border-b border-gray-700">Assets</th>
+              <th className="py-2 px-4 border-b border-gray-700">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -116,6 +117,11 @@ const LendBorrow = () => {
               <tr key={index}>
                 <td className="py-2 px-4 border-b border-gray-700">
                   {token.asset}
+                </td>
+                <td className="py-2 px-4 border-b border-gray-700">
+                  <button className="bg-accent text-white px-4 py-1 rounded">
+                    Deposit Collateral
+                  </button>
                 </td>
               </tr>
             ))}
@@ -160,6 +166,7 @@ const LendBorrow = () => {
           <thead>
             <tr>
               <th className="py-2 px-4 border-b border-gray-700">Assets</th>
+              <th className="py-2 px-4 border-b border-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -167,6 +174,11 @@ const LendBorrow = () => {
               <tr key={index}>
                 <td className="py-2 px-4 border-b border-gray-700">
                   {token.asset}
+                </td>
+                <td className="py-2 px-4 border-b border-gray-700">
+                  <button className="bg-accent text-white px-4 py-1 rounded">
+                    Supply
+                  </button>
                 </td>
               </tr>
             ))}
@@ -178,12 +190,12 @@ const LendBorrow = () => {
 
   return (
     <div>
-      <div className="flex space-x-2 my-2">
+      <div className="flex space-x-1 my-2">
         <button
           className={`px-4 py-2 text-2xl rounded w-1/2 ${
             selectedOption === "borrow"
               ? "bg-white text-accent"
-              : "bg-secondary text-gray-400"
+              : "bg-gray-200 text-gray-900"
           }`}
           onClick={() => setSelectedOption("borrow")}
         >
@@ -193,7 +205,7 @@ const LendBorrow = () => {
           className={`px-4 py-2 text-2xl rounded w-1/2 ${
             selectedOption === "lend"
               ? "bg-white text-accent"
-              : "bg-secondary text-gray-400"
+              : "bg-gray-200 text-gray-900"
           }`}
           onClick={() => setSelectedOption("lend")}
         >

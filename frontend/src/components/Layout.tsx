@@ -20,7 +20,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
           <Image
             src={Logo}
             alt="Logo"
-            className="w-[120px] h-[80px] md:w-[120px] md:h-[80px]"
+            className="w-[140px] h-[60px] md:w-[140px] md:h-[60px]"
             style={{
               filter: "drop-shadow(0px 0px 24px #a726a9a8)",
             }}
