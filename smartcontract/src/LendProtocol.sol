@@ -12,10 +12,18 @@ import {IERC20} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {SafeERC20} from
+    "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./library/Math.sol";
 
-contract LendProtocol is OwnerIsCreator {
+contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     using Math for uint256;
+    using SafeERC20 for IERC20;
+
+    ////////////////////////////
+    /////// Errors /////////////
+    ////////////////////////////
+    error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
 
     error Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
     error Error__DepositCollateralFailed();
@@ -68,14 +76,30 @@ contract LendProtocol is OwnerIsCreator {
     mapping(address => address) s_priceFeeds;
     mapping(address => IRouterClient) s_routers;
     IRouterClient router;
-    uint256 chainSelector;
+    uint64 chainSelector;
 
-    // Collateral Deposit Address => Deposited Token Address ==> amount
-    // mapping(address => mapping(address => uint256)) public s_collateralDeposit;
-    // Depsitor Address => Deposited Token Address ==> amount
-    //mapping(address => mapping(address => uint256)) public s_deposits;
-    // Depsitor Address => Borrowed Token Address ==> amount
-    //mapping(address => mapping(address => uint256)) public s_borrowings;
+    bytes32 private s_lastReceivedMessageId; // Store the last received messageId.
+    string private s_lastReceivedText; // Store the last received text.
+
+    ////////////////////////
+    ///// Events       /////
+    ////////////////////////
+    // Event emitted when a message is sent to another chain.
+    event MessageSent(
+        bytes32 indexed messageId,
+        uint64 indexed destinationChainSelector,
+        address receiver,
+        string text,
+        address feeToken,
+        uint256 fees
+    );
+
+    // Event emitted when a message is received from another chain.
+    event MessageReceived( // The unique ID of the message.
+        // The chain selector of the source chain.
+        // The address of the sender from the source chain.
+        // The text that was received.
+    bytes32 indexed messageId, uint64 indexed sourceChainSelector, address sender, string text);
 
     ///////////////////////
     //// Modifiers ///////
@@ -101,19 +125,18 @@ contract LendProtocol is OwnerIsCreator {
      */
     constructor(
         address _router,
-        uint256 _chainSelector,
+        uint64 _chainSelector,
         address[] memory _tokenAddresses,
         address[] memory priceFeedAddresses
-    ) {
+    ) CCIPReceiver(_router) {
         if (_tokenAddresses.length != priceFeedAddresses.length) {
             revert Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
         }
         for (uint256 i = 0; i < _tokenAddresses.length; i++) {
             s_priceFeeds[_tokenAddresses[i]] = priceFeedAddresses[i];
             s_tokenAddresses.push(IERC20(_tokenAddresses[i]));
-            //s_routers[_tokenAddresses[i]] = IRouterClient(_routers[i]);
-            router = IRouterClient(_router);
         }
+        router = IRouterClient(_router);
         chainSelector = _chainSelector;
     }
 
@@ -178,20 +201,6 @@ contract LendProtocol is OwnerIsCreator {
         if (!success) {
             revert Error__DepositCollateralFailed();
         }
-    }
-
-    // Function to borrow tokens
-    function borrowToken(address tokenAddress, uint256 amount, uint256 collateralAmount) external {
-        // Over-collateralization check and transfer collateral logic here
-        BorrowInfo storage info = s_borrowInfo[msg.sender][tokenAddress];
-        info.amount += amount;
-        //info.collateralAmount += collateralAmount;
-        info.timestamp = block.timestamp;
-
-        TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
-        tokenDataInfo.totalBorrowed += amount;
-
-        IERC20(tokenAddress).transfer(msg.sender, amount);
     }
 
     /**
@@ -323,5 +332,63 @@ contract LendProtocol is OwnerIsCreator {
         if (!success) {
             revert Error__PaybackBorrowFailed();
         }
+    }
+
+    function borrowOnDifferentChain(address receiver, string calldata text) external returns (bytes32 messageId) {
+        // Create a tokenTransferMessage struct in memory with necessary information for sending a cross-chain message
+        Client.EVM2AnyMessage memory tokenTransferMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(receiver), // ABI-encoded receiver address
+            data: abi.encode(text), // ABI-encoded string
+            tokenAmounts: new Client.EVMTokenAmount[](0), // Empty array indicating no tokens are being sent
+            extraArgs: Client._argsToBytes(
+                // Additional arguments, setting gas limit
+                Client.EVMExtraArgsV1({gasLimit: 200_000})
+            ),
+            // Set the feeToken address (e.g., LINK)
+            feeToken: address(0) // Replace address(0) with the actual LINK token address
+        });
+
+        // Get the fee required to send the message
+        uint256 fees = router.getFee(chainSelector, tokenTransferMessage);
+
+        // Ensure the contract has enough LINK tokens to pay the fees
+        IERC20 linkToken = IERC20(address(0)); // Replace address(0) with the LINK token address
+        uint256 balance = linkToken.balanceOf(address(this));
+
+        if (fees > balance) {
+            revert NotEnoughBalance(balance, fees);
+        }
+
+        // Approve the Router to transfer LINK tokens on the contract's behalf
+        linkToken.approve(address(router), fees);
+
+        // Send the message through the router and store the returned message ID
+        messageId = router.ccipSend(chainSelector, tokenTransferMessage);
+
+        // Emit an event with message details
+        emit MessageSent(messageId, chainSelector, receiver, text, address(linkToken), fees);
+
+        // Return the message ID
+        return messageId;
+    }
+
+    /// handle a received message
+    function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage) internal override {
+        s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
+        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
+
+        emit MessageReceived(
+            any2EvmMessage.messageId,
+            any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
+            abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
+            abi.decode(any2EvmMessage.data, (string))
+        );
+    }
+
+    /// @notice Fetches the details of the last received message.
+    /// @return messageId The ID of the last received message.
+    /// @return text The last received text.
+    function getLastReceivedMessageDetails() external view returns (bytes32 messageId, string memory text) {
+        return (s_lastReceivedMessageId, s_lastReceivedText);
     }
 }
