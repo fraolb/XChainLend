@@ -89,6 +89,7 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     mapping(address => IRouterClient) s_routers;
     IRouterClient router;
     uint64 chainSelector;
+    Chain protocolChain;
 
     bytes32 private s_lastReceivedMessageId; // Store the last received messageId.
     address private s_lastReceivedTokenAddress; // Store the last received token address.
@@ -178,7 +179,8 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         address _router,
         uint64 _chainSelector,
         address[] memory _tokenAddresses,
-        address[] memory priceFeedAddresses
+        address[] memory priceFeedAddresses,
+        Chain chain
     ) CCIPReceiver(_router) {
         if (_tokenAddresses.length != priceFeedAddresses.length) {
             revert Error__TokenAddressesAndRoutersAddressesMustBeSameLength();
@@ -189,6 +191,7 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
         router = IRouterClient(_router);
         chainSelector = _chainSelector;
+        protocolChain = chain;
     }
 
     /// @dev Updates the allowlist status of a destination chain for transactions.
@@ -213,6 +216,7 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         info.amount += amount;
         info.lendToken = tokenAddress;
         info.timestamp = block.timestamp;
+        info.chain = protocolChain;
 
         TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
         tokenDataInfo.totalLiquidity += amount;
@@ -267,11 +271,25 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         info.collateralToken = tokenCollateralAddress;
         info.collateralAmount = collateralAmount;
         info.timestamp = block.timestamp;
+        info.chain = protocolChain;
         // s_collateralDeposit[msg.sender][tokenCollateralAddress] += collateralAmount;
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), collateralAmount);
         if (!success) {
             revert Error__DepositCollateralFailed();
         }
+    }
+
+    function depositCollateralFromDifferentChain(
+        address user,
+        address tokenCollateralAddress,
+        uint256 collateralAmount,
+        Chain chain
+    ) internal {
+        CollateralInfo storage info = s_collateralInfo[user][tokenCollateralAddress];
+        info.collateralToken = tokenCollateralAddress;
+        info.collateralAmount = collateralAmount;
+        info.timestamp = block.timestamp;
+        info.chain = chain;
     }
 
     /**
