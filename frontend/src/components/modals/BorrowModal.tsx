@@ -174,6 +174,9 @@ const BorrowModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
           onChange={(e) => setAmount(e.target.value)}
           className="w-full mb-4 p-2 border border-gray-300 rounded"
         />
+        <div className="text-sm font-light text-end pr-2 pb-2">
+          Health Factor 2
+        </div>
         {activeChain?.id == selectedChain?.id ? (
           <button
             onClick={handleSupply}

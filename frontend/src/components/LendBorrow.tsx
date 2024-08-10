@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useActiveWalletChain } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
-import { sepolia, baseSepolia, avalancheFuji } from "thirdweb/chains";
+import { optimismSepolia, baseSepolia, avalancheFuji } from "thirdweb/chains";
 import { createWallet } from "thirdweb/wallets";
 import { client } from "@/app/client";
 
@@ -150,7 +150,7 @@ const LendBorrow = () => {
                   createWallet("me.rainbow"),
                 ]}
                 theme="light"
-                chains={[baseSepolia, sepolia, avalancheFuji]}
+                chains={[baseSepolia, optimismSepolia, avalancheFuji]}
                 appMetadata={{
                   name: "XChain Lend",
                   url: "https://example.com",

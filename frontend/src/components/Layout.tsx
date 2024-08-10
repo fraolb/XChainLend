@@ -1,7 +1,12 @@
 "use client";
 import { FC, ReactNode } from "react";
 import { ConnectButton } from "thirdweb/react";
-import { sepolia, baseSepolia, avalancheFuji } from "thirdweb/chains";
+import {
+  sepolia,
+  baseSepolia,
+  avalancheFuji,
+  optimismSepolia,
+} from "thirdweb/chains";
 import { client } from "@/app/client";
 import Link from "next/link";
 import { createWallet } from "thirdweb/wallets";
@@ -63,7 +68,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
                   createWallet("me.rainbow"),
                 ]}
                 theme="light"
-                chains={[baseSepolia, sepolia, avalancheFuji]}
+                chains={[baseSepolia, optimismSepolia, avalancheFuji]}
                 appMetadata={{
                   name: "XChain Lend",
                   url: "https://example.com",
