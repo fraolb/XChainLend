@@ -8,6 +8,9 @@ import { sepolia, baseSepolia, avalancheFuji } from "thirdweb/chains";
 import { createWallet } from "thirdweb/wallets";
 import { client } from "@/app/client";
 
+import Lend from "./Lend";
+import Borrow from "./Borrow";
+
 import Avax from "@public/avax.png";
 import Base from "@public/base.png";
 import Optimism from "@public/optimism.png";
@@ -335,9 +338,7 @@ const LendBorrow = () => {
           Lend
         </button>
       </div>
-      {selectedOption === "borrow"
-        ? renderBorrowSection()
-        : renderLendSection()}
+      {selectedOption === "borrow" ? renderBorrowSection() : Lend()}
     </div>
   );
 };
