@@ -6,13 +6,19 @@ import { client } from "@/app/client";
 import Link from "next/link";
 import { createWallet } from "thirdweb/wallets";
 import Logo from "@public/Xchain logo.png";
+import Avax from "@public/avax.png";
+import Base from "@public/base.png";
+import Optimism from "@public/optimism.png";
 import Image from "next/image";
+import { useActiveWalletChain } from "thirdweb/react";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const Layout: FC<LayoutProps> = ({ children }) => {
+  const activeChain = useActiveWalletChain();
+  console.log("the active chain is ", activeChain);
   return (
     <div className="bg-primary min-h-screen w-full">
       <header className="p-4 bg-secondary shadow-lg border-b border-solid">
@@ -33,6 +39,22 @@ const Layout: FC<LayoutProps> = ({ children }) => {
               Liquidators
             </Link>
             <div className="text-accent">
+              <Image
+                src={
+                  activeChain?.id == 43113
+                    ? Avax
+                    : activeChain?.id == 84532
+                    ? Base
+                    : Optimism
+                }
+                alt="Chain"
+                className="w-[40px] h-[40px] md:w-[40px] md:h-[40px]"
+                style={{
+                  filter: "drop-shadow(0px 0px 24px #a726a9a8)",
+                }}
+              />
+            </div>
+            <div className="text-accent">
               <ConnectButton
                 client={client}
                 wallets={[
@@ -41,7 +63,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
                   createWallet("me.rainbow"),
                 ]}
                 theme="light"
-                chains={[sepolia, baseSepolia, avalancheFuji]}
+                chains={[baseSepolia, sepolia, avalancheFuji]}
                 appMetadata={{
                   name: "XChain Lend",
                   url: "https://example.com",
