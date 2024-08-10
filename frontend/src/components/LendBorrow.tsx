@@ -15,15 +15,14 @@ import Avax from "@public/avax.png";
 import Base from "@public/base.png";
 import Optimism from "@public/optimism.png";
 
+import BorrowModal from "./modals/BorrowModal";
+import WithdrawModal from "./modals/WithdrawModal";
+import DepositModal from "./modals/DepositModal";
+
 type BorrowData = {
   borrowed: { asset: string; amount: number; apy: string; chain: string }[];
-  collateral: { asset: string; amount: number; apy: string; chain: string }[];
-  tokens: { asset: string }[];
-};
-
-type LendData = {
-  lent: { asset: string; amount: number; apy: string; chain: string }[];
-  tokens: { asset: string; apy: string }[];
+  collateral: { asset: string; amount: number; chain: string }[];
+  tokens: { asset: string; chains: string[] }[];
 };
 
 const LendBorrow = () => {
@@ -31,6 +30,19 @@ const LendBorrow = () => {
   const [selectedOption, setSelectedOption] = useState<"borrow" | "lend">(
     "borrow"
   );
+
+  // states for borrow
+  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
+  const openBorrowModal = () => setIsBorrowModalOpen(true);
+  const closeBorrowModal = () => setIsBorrowModalOpen(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const openDepositModal = () => setIsDepositModalOpen(true);
+  const closeDepositModal = () => setIsDepositModalOpen(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const openWithdrawModal = () => setIsWithdrawModalOpen(true);
+  const closeWithdrawModal = () => setIsWithdrawModalOpen(false);
+
+  // states for lend
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const openSupplyModal = () => setIsSupplyModalOpen(true);
   const closeSupplyModal = () => setIsSupplyModalOpen(false);
@@ -41,27 +53,27 @@ const LendBorrow = () => {
 
   const borrowData: BorrowData = {
     borrowed: [
-      { asset: "ETH", amount: 1.5, apy: "3.5%", chain: "Avax" },
-      { asset: "DAI", amount: 500, apy: "4.2%", chain: "Base" },
+      { asset: "USDC", amount: 50, apy: "4.2%", chain: "Base" },
+      { asset: "CCIP-BnM", amount: 1, apy: "5.0%", chain: "Avax" },
     ],
-    collateral: [
-      { asset: "ETH", amount: 1.5, apy: "3.5%", chain: "Avax" },
-      { asset: "DAI", amount: 500, apy: "4.2%", chain: "Base" },
-    ],
-    tokens: [{ asset: "USDT" }, { asset: "WBTC" }],
-  };
-
-  const lendData: LendData = {
-    lent: [{ asset: "USDC", amount: 1000, apy: "2.1%", chain: "Base" }],
+    collateral: [{ asset: "CCIP-BnM", amount: 2.5, chain: "Avax" }],
     tokens: [
-      { asset: "AAVE", apy: "2.5" },
-      { asset: "LINK", apy: "2.0" },
+      { asset: "CCIP-BnM", chains: ["Base", "Optmism", "Avax"] },
+      { asset: "USDC", chains: ["Base", "Optmism", "Avax"] },
+      { asset: "GHO", chains: ["Base", "Avax"] },
     ],
   };
 
   const renderBorrowSection = () => (
     <section>
       <div className="bg-secondary text-black rounded-xl p-4 shadow-lg mb-6">
+        <BorrowModal isOpen={isBorrowModalOpen} onClose={closeBorrowModal} />
+        <WithdrawModal
+          isOpen={isWithdrawModalOpen}
+          onClose={closeWithdrawModal}
+        />
+        <DepositModal isOpen={isDepositModalOpen} onClose={closeDepositModal} />
+
         <h2 className="text-xl font-bold mb-2 ml-4">Borrowed Tokens</h2>
         {activeChain?.id == 84532 ? (
           <table className="w-full text-left">
@@ -97,9 +109,6 @@ const LendBorrow = () => {
                       }
                       alt="Chain"
                       className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
-                      style={{
-                        filter: "drop-shadow(0px 0px 24px #a726a9a8)",
-                      }}
                     />
                   </td>
                   <td className="py-2 px-4 border-b border-gray-700">
@@ -159,7 +168,6 @@ const LendBorrow = () => {
               <tr>
                 <th className="py-2 px-4 border-b border-gray-700">Assets</th>
                 <th className="py-2 px-4 border-b border-gray-700">Amount</th>
-                <th className="py-2 px-4 border-b border-gray-700">APY</th>
                 <th className="py-2 px-4 border-b border-gray-700">Chain</th>
                 <th className="py-2 px-4 border-b border-gray-700">Action</th>
               </tr>
@@ -174,9 +182,6 @@ const LendBorrow = () => {
                     {token.amount}
                   </td>
                   <td className="py-2 px-4 border-b border-gray-700">
-                    {token.apy}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
                     <Image
                       src={
                         token.chain == "Avax"
@@ -187,13 +192,13 @@ const LendBorrow = () => {
                       }
                       alt="Chain"
                       className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
-                      style={{
-                        filter: "drop-shadow(0px 0px 24px #a726a9a8)",
-                      }}
                     />
                   </td>
                   <td className="py-2 px-4 border-b border-gray-700">
-                    <button className="bg-accent text-white px-4 py-1 rounded">
+                    <button
+                      className="bg-accent text-white px-4 py-1 rounded"
+                      onClick={() => openWithdrawModal()}
+                    >
                       Redeem
                     </button>
                   </td>
@@ -215,7 +220,9 @@ const LendBorrow = () => {
           <thead>
             <tr>
               <th className="py-2 px-4 border-b border-gray-700">Assets</th>
+              <th className="py-2 px-4 border-b border-gray-700">Chains</th>
               <th className="py-2 px-4 border-b border-gray-700">Action</th>
+              <th className="py-2 px-4 border-b border-gray-700"></th>
             </tr>
           </thead>
           <tbody>
@@ -224,9 +231,29 @@ const LendBorrow = () => {
                 <td className="py-2 px-4 border-b border-gray-700">
                   {token.asset}
                 </td>
+                <td className="py-2 px-4 flex border-b border-gray-700">
+                  {token.chains.map((i) => (
+                    <Image
+                      src={i == "Avax" ? Avax : i == "Base" ? Base : Optimism}
+                      alt="Chain"
+                      className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
+                    />
+                  ))}
+                </td>
                 <td className="py-2 px-4 border-b border-gray-700">
-                  <button className="bg-accent text-white px-4 py-1 rounded">
+                  <button
+                    className="bg-accent text-white px-4 py-1 rounded"
+                    onClick={() => openDepositModal()}
+                  >
                     Deposit Collateral
+                  </button>
+                </td>
+                <td className="py-2 px-4 border-b border-gray-700">
+                  <button
+                    className="bg-accent text-white px-4 py-1 rounded"
+                    onClick={() => openBorrowModal()}
+                  >
+                    Borrow Token
                   </button>
                 </td>
               </tr>

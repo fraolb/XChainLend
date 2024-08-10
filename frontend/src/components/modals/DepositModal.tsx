@@ -34,7 +34,7 @@ interface SupplyModalProps {
   onClose: () => void;
 }
 
-const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
+const DepositModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   const activeChain = useActiveWalletChain();
   const switchChain = useSwitchActiveWalletChain();
   const [selectedChain, setSelectedChain] = useState(baseSepolia);
@@ -196,4 +196,4 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default SupplyModal;
+export default DepositModal;

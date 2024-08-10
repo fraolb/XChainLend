@@ -34,7 +34,7 @@ interface SupplyModalProps {
   onClose: () => void;
 }
 
-const WithdrawSupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
+const WithdrawModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   const activeChain = useActiveWalletChain();
   const switchChain = useSwitchActiveWalletChain();
   const [selectedChain, setSelectedChain] = useState(baseSepolia);
@@ -133,7 +133,7 @@ const WithdrawSupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center text-black">
-      <div className="bg-white p-6 rounded-lg w-96">
+      <div className="bg-white z-20 p-6 rounded-lg w-96">
         <div className="flex justify-end">
           <button
             className="text-white text-red-500 rounded-lg text-2xl"
@@ -142,7 +142,7 @@ const WithdrawSupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
             x
           </button>
         </div>
-        <h2 className="text-xl font-bold mb-4 text-accent">Withdraw Supply</h2>
+        <h2 className="text-xl font-bold mb-4 text-accent">Withdraw Token</h2>
 
         <label className="block mb-2">Amount</label>
         <input
@@ -164,4 +164,4 @@ const WithdrawSupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default WithdrawSupplyModal;
+export default WithdrawModal;

@@ -7,11 +7,11 @@ import Avax from "@public/avax.png";
 import Base from "@public/base.png";
 import Optimism from "@public/optimism.png";
 import SupplyModal from "./modals/SupplyModal";
-import WithdrawSupplyModal from "./modals/WithdrawModal";
+import WithdrawModal from "./modals/WithdrawModal";
 
 type LendData = {
   lent: { asset: string; amount: number; apy: string; chain: string }[];
-  tokens: { asset: string; apy: string }[];
+  tokens: { asset: string; apy: string; chains: string[] }[];
 };
 
 interface ModalProps {
@@ -32,10 +32,11 @@ const Lend: React.FC<ModalProps> = ({
   closeWithdrawSupplyModal,
 }) => {
   const lendData: LendData = {
-    lent: [{ asset: "USDC", amount: 1000, apy: "2.1%", chain: "Base" }],
+    lent: [{ asset: "USDC", amount: 10, apy: "2.1%", chain: "Base" }],
     tokens: [
-      { asset: "AAVE", apy: "2.5" },
-      { asset: "LINK", apy: "2.0" },
+      { asset: "CCIP-BnM", apy: "2.5", chains: ["Base", "Optmism", "Avax"] },
+      { asset: "USDC", apy: "2.1", chains: ["Base", "Optmism", "Avax"] },
+      { asset: "GHO", apy: "2.5", chains: ["Base", "Avax"] },
     ],
   };
 
@@ -101,6 +102,7 @@ const Lend: React.FC<ModalProps> = ({
             <thead>
               <tr>
                 <th className="py-2 px-4 border-b border-gray-700">Assets</th>
+                <th className="py-2 px-4 border-b border-gray-700">Chains</th>
                 <th className="py-2 px-4 border-b border-gray-700">APY</th>
                 <th className="py-2 px-4 border-b border-gray-700">Actions</th>
               </tr>
@@ -110,6 +112,15 @@ const Lend: React.FC<ModalProps> = ({
                 <tr key={index}>
                   <td className="py-2 px-4 border-b border-gray-700">
                     {token.asset}
+                  </td>
+                  <td className="py-2 flex px-4 border-b border-gray-700">
+                    {token.chains.map((i) => (
+                      <Image
+                        src={i == "Avax" ? Avax : i == "Base" ? Base : Optimism}
+                        alt="Chain"
+                        className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
+                      />
+                    ))}
                   </td>
                   <td className="py-2 px-4 border-b border-gray-700">
                     {token.apy}
@@ -128,7 +139,7 @@ const Lend: React.FC<ModalProps> = ({
           </table>
         </div>
         <SupplyModal isOpen={isSupplyModalOpen} onClose={closeSupplyModal} />
-        <WithdrawSupplyModal
+        <WithdrawModal
           isOpen={isWithdrawSupplyModalOpen}
           onClose={closeWithdrawSupplyModal}
         />
