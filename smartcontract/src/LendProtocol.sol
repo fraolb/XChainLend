@@ -37,12 +37,16 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     error Error__WithdrawLendFailed();
     error Error__BorrowAmountExceedsLiquidity();
     error Error__PaybackBorrowFailed();
+    error DestinationChainNotAllowed(uint64);
+    error SourceChainNotAllowed(uint64);
+    error SenderNotAllowed(address);
 
     struct LenderInfo {
         uint256 amount;
         address lendToken;
         uint256 timestamp;
         uint256 interestAccrued;
+        Chain chain;
     }
 
     struct TokenData {
@@ -56,12 +60,20 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         address borrowedToken;
         bool onTheSameChain;
         uint256 timestamp;
+        Chain chain;
     }
 
     struct CollateralInfo {
         uint256 timestamp;
         address collateralToken;
         uint256 collateralAmount;
+        Chain chain;
+    }
+
+    enum Chain {
+        OPTIMISM,
+        BASE,
+        CELO
     }
 
     mapping(address => mapping(address => LenderInfo)) public s_lenderInfo; // Lender => Token => Info
@@ -79,7 +91,18 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     uint64 chainSelector;
 
     bytes32 private s_lastReceivedMessageId; // Store the last received messageId.
+    address private s_lastReceivedTokenAddress; // Store the last received token address.
+    uint256 private s_lastReceivedTokenAmount; // Store the last received amount.
     string private s_lastReceivedText; // Store the last received text.
+
+    // Mapping to keep track of allowlisted destination chains.
+    mapping(uint64 => bool) public allowlistedDestinationChains;
+
+    // Mapping to keep track of allowlisted source chains.
+    mapping(uint64 => bool) public allowlistedSourceChains;
+
+    // Mapping to keep track of allowlisted senders.
+    mapping(address => bool) public allowlistedSenders;
 
     ////////////////////////
     ///// Events       /////
@@ -95,11 +118,19 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     );
 
     // Event emitted when a message is received from another chain.
-    event MessageReceived( // The unique ID of the message.
-        // The chain selector of the source chain.
-        // The address of the sender from the source chain.
-        // The text that was received.
-    bytes32 indexed messageId, uint64 indexed sourceChainSelector, address sender, string text);
+    // The chain selector of the source chain.
+    // The address of the sender from the source chain.
+    // The text that was received.
+    // The token address that was transferred.
+    // The token amount that was transferred.
+    event MessageReceived( // The unique ID of the CCIP message.
+        bytes32 indexed messageId,
+        uint64 indexed sourceChainSelector,
+        address sender,
+        string text,
+        address token,
+        uint256 tokenAmount
+    );
 
     ///////////////////////
     //// Modifiers ///////
@@ -115,6 +146,26 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         if (s_priceFeeds[token] == address(0)) {
             revert Error__NotAllowedToken();
         }
+        _;
+    }
+
+    /// @dev Modifier that checks if the chain with the given destinationChainSelector is allowlisted.
+    /// @param _destinationChainSelector The selector of the destination chain.
+    modifier onlyAllowlistedDestinationChain(uint64 _destinationChainSelector) {
+        if (!allowlistedDestinationChains[_destinationChainSelector]) {
+            revert DestinationChainNotAllowed(_destinationChainSelector);
+        }
+        _;
+    }
+
+    /// @dev Modifier that checks if the chain with the given sourceChainSelector is allowlisted and if the sender is allowlisted.
+    /// @param _sourceChainSelector The selector of the destination chain.
+    /// @param _sender The address of the sender.
+    modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
+        if (!allowlistedSourceChains[_sourceChainSelector]) {
+            revert SourceChainNotAllowed(_sourceChainSelector);
+        }
+        if (!allowlistedSenders[_sender]) revert SenderNotAllowed(_sender);
         _;
     }
 
@@ -140,12 +191,20 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         chainSelector = _chainSelector;
     }
 
+    /// @dev Updates the allowlist status of a destination chain for transactions.
+    /// @notice This function can only be called by the owner.
+    /// @param _destinationChainSelector The selector of the destination chain to be updated.
+    /// @param allowed The allowlist status to be set for the destination chain.
+    function allowlistDestinationChain(uint64 _destinationChainSelector, bool allowed) external onlyOwner {
+        allowlistedDestinationChains[_destinationChainSelector] = allowed;
+    }
+
     /**
-     * @notice This function is for anyone to lend tokens that are listed
+     * @notice This function is for anyone to lend tokens that are listed, on the same chain
      * @param tokenAddress is the token address of the token to be lend
      * @param amount the amount of token to be lend
      */
-    function lendToken(address tokenAddress, uint256 amount)
+    function lendTokenOnTheSameChain(address tokenAddress, uint256 amount)
         external
         isTokenAllowed(tokenAddress)
         amountMoreThanZero(amount)
@@ -164,12 +223,42 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
+    function lendTokenFromDifferentChain(address lender, address tokenAddress, uint256 amount, Chain chain)
+        internal
+        isTokenAllowed(tokenAddress)
+    {
+        LenderInfo storage info = s_lenderInfo[lender][tokenAddress];
+        info.amount += amount;
+        info.lendToken = tokenAddress;
+        info.timestamp = block.timestamp;
+        info.chain = chain;
+
+        TokenData storage tokenDataInfo = s_tokenData[tokenAddress];
+        tokenDataInfo.totalLiquidity += amount;
+    }
+
+    /// @dev Updates the allowlist status of a source chain
+    /// @notice This function can only be called by the owner.
+    /// @param _sourceChainSelector The selector of the source chain to be updated.
+    /// @param allowed The allowlist status to be set for the source chain.
+    function allowlistSourceChain(uint64 _sourceChainSelector, bool allowed) external onlyOwner {
+        allowlistedSourceChains[_sourceChainSelector] = allowed;
+    }
+
+    /// @dev Updates the allowlist status of a sender for transactions.
+    /// @notice This function can only be called by the owner.
+    /// @param _sender The address of the sender to be updated.
+    /// @param allowed The allowlist status to be set for the sender.
+    function allowlistSender(address _sender, bool allowed) external onlyOwner {
+        allowlistedSenders[_sender] = allowed;
+    }
+
     /**
-     * @notice The function helps users to deposit collateral before borrowing or to earn by lending
+     * @notice The function helps users to deposit collateral before borrowing or to earn by lending, on the same chain
      * @param tokenCollateralAddress The addresss of the token user deposit as collateral
      * @param collateralAmount The amount of the token deposited
      */
-    function depositCollateral(address tokenCollateralAddress, uint256 collateralAmount)
+    function depositCollateralOnTheSameChain(address tokenCollateralAddress, uint256 collateralAmount)
         external
         isTokenAllowed(tokenCollateralAddress)
         amountMoreThanZero(collateralAmount)
@@ -183,25 +272,6 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         if (!success) {
             revert Error__DepositCollateralFailed();
         }
-    }
-
-    /**
-     * @notice This function helps users to view how much collataral they have on one chain
-     * @return First it returns collateral token
-     * @return The second array returns the amount of each token collateral
-     */
-    function getCollateralAmount() public view returns (address[] memory, uint256[] memory) {
-        uint256 length = s_tokenAddresses.length;
-        address[] memory tokenAddresses = new address[](length);
-        uint256[] memory amounts = new uint256[](length);
-
-        for (uint256 i = 0; i < length; i++) {
-            address tokenAddress = address(s_tokenAddresses[i]);
-            tokenAddresses[i] = tokenAddress;
-            amounts[i] = s_collateralInfo[msg.sender][tokenAddress].collateralAmount;
-        }
-
-        return (tokenAddresses, amounts);
     }
 
     /**
@@ -245,7 +315,7 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
-    function withdrawLendToken(address tokenAddress, uint256 amountToBeWithdrawn)
+    function withdrawLendTokenOnTheSameChain(address tokenAddress, uint256 amountToBeWithdrawn)
         external
         isTokenAllowed(tokenAddress)
         amountMoreThanZero(amountToBeWithdrawn)
@@ -266,7 +336,7 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
-    function paybackBorrowedToken(address tokenAddress, uint256 amountToBePaid)
+    function paybackBorrowedTokenOnTheSameChain(address tokenAddress, uint256 amountToBePaid)
         external
         isTokenAllowed(tokenAddress)
         amountMoreThanZero(amountToBePaid)
@@ -322,15 +392,24 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     }
 
     /// handle a received message
-    function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage) internal override {
+    function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
+        internal
+        override
+        onlyAllowlisted(any2EvmMessage.sourceChainSelector, abi.decode(any2EvmMessage.sender, (address))) // Make sure source chain and sender are allowlisted
+    {
         s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
         s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
+        // Expect one token to be transferred at once, but you can transfer several tokens.
+        s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
+        s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
             abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            abi.decode(any2EvmMessage.data, (string))
+            abi.decode(any2EvmMessage.data, (string)),
+            any2EvmMessage.destTokenAmounts[0].token,
+            any2EvmMessage.destTokenAmounts[0].amount
         );
     }
 
@@ -344,6 +423,25 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     /////////////////////////////
     //// view            ///////
     ////////////////////////////
+
+    /**
+     * @notice This function helps users to view how much collataral they have on one chain
+     * @return First it returns collateral token
+     * @return The second array returns the amount of each token collateral
+     */
+    function getCollateralAmount() public view returns (address[] memory, uint256[] memory) {
+        uint256 length = s_tokenAddresses.length;
+        address[] memory tokenAddresses = new address[](length);
+        uint256[] memory amounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address tokenAddress = address(s_tokenAddresses[i]);
+            tokenAddresses[i] = tokenAddress;
+            amounts[i] = s_collateralInfo[msg.sender][tokenAddress].collateralAmount;
+        }
+
+        return (tokenAddresses, amounts);
+    }
 
     /**
      * @notice This function returns how much user lend a token
