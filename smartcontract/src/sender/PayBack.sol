@@ -68,89 +68,44 @@ contract PayBack is OwnerIsCreator {
     }
 
     /// @notice Sends data and transfer tokens to receiver on the destination chain.
-    /// @notice Pay for fees in LINK.
-    /// @dev Assumes your contract has sufficient LINK to pay for CCIP fees.
-    /// @param _destinationChainSelector The identifier (aka selector) for the destination blockchain.
-    /// @param _receiver The address of the recipient on the destination blockchain.
-    /// @param _text The string data to be sent.
-    /// @param _token token address.
-    /// @param _amount token amount.
-    /// @return messageId The ID of the CCIP message that was sent.
-    function sendMessagePayLINK(
-        uint64 _destinationChainSelector,
-        address _receiver,
-        string calldata _text,
-        address _token,
-        uint256 _amount
-    ) external onlyAllowlistedDestinationChain(_destinationChainSelector) returns (bytes32 messageId) {
-        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
-        // address(linkToken) means fees are paid in LINK
-        Client.EVM2AnyMessage memory evm2AnyMessage =
-            _buildCCIPMessage(_receiver, _text, _token, _amount, address(s_linkToken));
-
-        // Get the fee required to send the CCIP message
-        uint256 fees = s_router.getFee(_destinationChainSelector, evm2AnyMessage);
-
-        if (fees > s_linkToken.balanceOf(address(this))) {
-            revert NotEnoughBalance(s_linkToken.balanceOf(address(this)), fees);
-        }
-
-        // approve the Router to transfer LINK tokens on contract's behalf. It will spend the fees in LINK
-        s_linkToken.approve(address(s_router), fees);
-
-        // approve the Router to spend tokens on contract's behalf. It will spend the amount of the given token
-        IERC20(_token).approve(address(s_router), _amount);
-
-        // Send the message through the router and store the returned message ID
-        messageId = s_router.ccipSend(_destinationChainSelector, evm2AnyMessage);
-
-        // Emit an event with message details
-        emit MessageSent(
-            messageId, _destinationChainSelector, _receiver, _text, _token, _amount, address(s_linkToken), fees
-        );
-
-        // Return the message ID
-        return messageId;
-    }
-
-    /// @notice Sends data and transfer tokens to receiver on the destination chain.
     /// @notice Pay for fees in native gas.
     /// @dev Assumes your contract has sufficient native gas like ETH on Ethereum or MATIC on Polygon.
     /// @param _destinationChainSelector The identifier (aka selector) for the destination blockchain.
     /// @param _receiver The address of the recipient on the destination blockchain.
-    /// @param _text The string data to be sent.
     /// @param _token token address.
     /// @param _amount token amount.
     /// @return messageId The ID of the CCIP message that was sent.
-    function sendMessagePayNative(
-        uint64 _destinationChainSelector,
-        address _receiver,
-        string calldata _text,
-        address _token,
-        uint256 _amount
-    ) external onlyAllowlistedDestinationChain(_destinationChainSelector) returns (bytes32 messageId) {
-        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
-        // address(0) means fees are paid in native gas
-        Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(_receiver, _text, _token, _amount, address(0));
+    function sendMessagePayNative(uint64 _destinationChainSelector, address _receiver, address _token, uint256 _amount)
+        external
+        onlyAllowlistedDestinationChain(_destinationChainSelector)
+        returns (bytes32 messageId)
+    {
+        // Step 1: Transfer tokens from the user to the contract
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
 
-        // Initialize a router client instance to interact with cross-chain router
-        //IRouterClient router = IRouterClient(this.getRouter());
+        // Step 2: Create a JSON message with the sender's address and the task description
+        string memory jsonData = createMessage(msg.sender, "payback");
 
-        // Get the fee required to send the CCIP message
+        // Step 3: Build the CCIP message with the token and amount to be sent
+        Client.EVM2AnyMessage memory evm2AnyMessage =
+            _buildCCIPMessage(_receiver, jsonData, _token, _amount, address(0));
+
+        // Step 4: Get the fee required for sending the CCIP message
         uint256 fees = s_router.getFee(_destinationChainSelector, evm2AnyMessage);
 
+        // Step 5: Check if the contract has enough balance to cover the fees
         if (fees > address(this).balance) {
             revert NotEnoughBalance(address(this).balance, fees);
         }
 
-        // approve the Router to spend tokens on contract's behalf. It will spend the amount of the given token
+        // Step 6: Approve the router to spend the user's tokens on behalf of the contract
         IERC20(_token).approve(address(s_router), _amount);
 
-        // Send the message through the router and store the returned message ID
+        // Step 7: Send the message through the router
         messageId = s_router.ccipSend{value: fees}(_destinationChainSelector, evm2AnyMessage);
 
         // Emit an event with message details
-        emit MessageSent(messageId, _destinationChainSelector, _receiver, _text, _token, _amount, address(0), fees);
+        emit MessageSent(messageId, _destinationChainSelector, _receiver, "Payback", _token, _amount, address(0), fees);
 
         // Return the message ID
         return messageId;
@@ -166,7 +121,7 @@ contract PayBack is OwnerIsCreator {
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
-        string calldata _text,
+        string memory _text,
         address _token,
         uint256 _amount,
         address _feeTokenAddress
@@ -186,6 +141,29 @@ contract PayBack is OwnerIsCreator {
             // Set the feeToken to a feeTokenAddress, indicating specific asset will be used for fees
             feeToken: _feeTokenAddress
         });
+    }
+
+    function createMessage(address user, string memory task) internal pure returns (string memory) {
+        // Convert the user address and task into a JSON string
+        return string(abi.encodePacked('{"user":"', toAsciiString(user), '", "task":"', task, '"}'));
+    }
+
+    // Helper function to convert address to string
+    function toAsciiString(address x) internal pure returns (string memory) {
+        bytes memory s = new bytes(40);
+        for (uint256 i = 0; i < 20; i++) {
+            bytes1 b = bytes1(uint8(uint256(uint160(x)) / (2 ** (8 * (19 - i)))));
+            bytes1 hi = bytes1(uint8(b) / 16);
+            bytes1 lo = bytes1(uint8(b) - 16 * uint8(hi));
+            s[2 * i] = char(hi);
+            s[2 * i + 1] = char(lo);
+        }
+        return string(s);
+    }
+
+    function char(bytes1 b) internal pure returns (bytes1 c) {
+        if (uint8(b) < 10) return bytes1(uint8(b) + 0x30);
+        else return bytes1(uint8(b) + 0x57);
     }
 
     /// @notice Fallback function to allow the contract to receive Ether.
