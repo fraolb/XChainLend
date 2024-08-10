@@ -371,6 +371,17 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
         }
     }
 
+    function paybackBorrowedTokenFromDifferentChain(address user, address tokenAddress, uint256 amountToBePaid)
+        internal
+    {
+        BorrowInfo storage borrowedInfo = s_borrowInfo[user][tokenAddress];
+
+        borrowedInfo.amount -= amountToBePaid;
+        TokenData storage token = s_tokenData[tokenAddress];
+        token.totalLiquidity += amountToBePaid;
+        token.totalBorrowed -= amountToBePaid;
+    }
+
     function borrowOnDifferentChain(address receiver, string calldata text) external returns (bytes32 messageId) {
         // Create a tokenTransferMessage struct in memory with necessary information for sending a cross-chain message
         Client.EVM2AnyMessage memory tokenTransferMessage = Client.EVM2AnyMessage({
