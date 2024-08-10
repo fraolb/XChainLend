@@ -424,22 +424,81 @@ contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
-        onlyAllowlisted(any2EvmMessage.sourceChainSelector, abi.decode(any2EvmMessage.sender, (address))) // Make sure source chain and sender are allowlisted
+        onlyAllowlisted(any2EvmMessage.sourceChainSelector, abi.decode(any2EvmMessage.sender, (address)))
     {
-        s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
-        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
-        // Expect one token to be transferred at once, but you can transfer several tokens.
+        s_lastReceivedMessageId = any2EvmMessage.messageId;
+        string memory receivedJson = abi.decode(any2EvmMessage.data, (string));
+
+        // Parse the JSON string (assume you have a JSON parsing library or use manual parsing)
+        (address user, string memory task) = parseJson(receivedJson);
+
         s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
         s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
 
+        if (keccak256(bytes(task)) == keccak256(bytes("payback"))) {
+            paybackBorrowedTokenFromDifferentChain(
+                user, any2EvmMessage.destTokenAmounts[0].token, any2EvmMessage.destTokenAmounts[0].amount
+            );
+        } else if (keccak256(bytes(task)) == keccak256(bytes("lend"))) {
+            lendTokenFromDifferentChain(
+                user,
+                any2EvmMessage.destTokenAmounts[0].token,
+                any2EvmMessage.destTokenAmounts[0].amount,
+                Chain.OPTIMISM
+            );
+        } else if (keccak256(bytes(task)) == keccak256(bytes("depositCollateral"))) {
+            depositCollateralFromDifferentChain(
+                user,
+                any2EvmMessage.destTokenAmounts[0].token,
+                any2EvmMessage.destTokenAmounts[0].amount,
+                Chain.OPTIMISM
+            );
+        }
+
         emit MessageReceived(
             any2EvmMessage.messageId,
-            any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
-            abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            abi.decode(any2EvmMessage.data, (string)),
+            any2EvmMessage.sourceChainSelector,
+            user,
+            task,
             any2EvmMessage.destTokenAmounts[0].token,
             any2EvmMessage.destTokenAmounts[0].amount
         );
+    }
+
+    // Example of a basic JSON parser
+    function parseJson(string memory json) internal pure returns (address user, string memory task) {
+        // Basic string manipulation to extract user and task
+        // Assume JSON format is always: {"user":"<address>", "task":"<task>"}
+
+        bytes memory jsonBytes = bytes(json);
+        bytes memory addressBytes = new bytes(42); // "0x" + 40 hex characters
+        bytes memory taskBytes = new bytes(jsonBytes.length - 55); // Length of task string
+
+        for (uint256 i = 10; i < 52; i++) {
+            // Extract the address
+            addressBytes[i - 10] = jsonBytes[i];
+        }
+        user = parseAddress(string(addressBytes));
+
+        for (uint256 i = 55; i < jsonBytes.length - 2; i++) {
+            // Extract the task
+            taskBytes[i - 55] = jsonBytes[i];
+        }
+        task = string(taskBytes);
+    }
+
+    // Helper function to parse an address string back into an address
+    function parseAddress(string memory addressString) internal pure returns (address) {
+        bytes memory b = bytes(addressString);
+        uint160 result = 0;
+        for (uint256 i = 2; i < 2 + 40; i++) {
+            uint256 c = uint256(uint8(b[i]));
+            if (c >= 97) c -= 87;
+            else if (c >= 65) c -= 55;
+            else if (c >= 48) c -= 48;
+            result = uint160(result * 16 + c);
+        }
+        return address(result);
     }
 
     /// @notice Fetches the details of the last received message.
