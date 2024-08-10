@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 
 import Avax from "@public/avax.png";
@@ -13,12 +13,13 @@ type LendData = {
   tokens: { asset: string; apy: string }[];
 };
 
-const Lend = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+interface ModalProps {
+  isModalOpen: boolean;
+  openModal: () => void;
+  closeModal: () => void;
+}
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
-
+const Lend: React.FC<ModalProps> = ({ isModalOpen, openModal, closeModal }) => {
   const lendData: LendData = {
     lent: [{ asset: "USDC", amount: 1000, apy: "2.1%", chain: "Base" }],
     tokens: [
@@ -112,7 +113,7 @@ const Lend = () => {
             </tbody>
           </table>
         </div>
-        {/* <SupplyModal isOpen={isModalOpen} onClose={closeModal} /> */}
+        <SupplyModal isOpen={isModalOpen} onClose={closeModal} />
       </section>
     </div>
   );

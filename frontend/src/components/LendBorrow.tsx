@@ -31,6 +31,9 @@ const LendBorrow = () => {
   const [selectedOption, setSelectedOption] = useState<"borrow" | "lend">(
     "borrow"
   );
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
 
   const borrowData: BorrowData = {
     borrowed: [
@@ -338,7 +341,15 @@ const LendBorrow = () => {
           Lend
         </button>
       </div>
-      {selectedOption === "borrow" ? renderBorrowSection() : Lend()}
+      {selectedOption === "borrow" ? (
+        renderBorrowSection()
+      ) : (
+        <Lend
+          isModalOpen={isModalOpen}
+          openModal={openModal}
+          closeModal={closeModal}
+        />
+      )}
     </div>
   );
 };

@@ -45,9 +45,17 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center text-black">
       <div className="bg-white p-6 rounded-lg w-96">
-        <h2 className="text-xl font-bold mb-4">Supply Tokens</h2>
+        <div className="flex justify-end">
+          <button
+            className="text-white text-red-600 rounded-lg text-2xl"
+            onClick={() => onClose()}
+          >
+            x
+          </button>
+        </div>
+        <h2 className="text-xl font-bold mb-4 text-accent">Supply Tokens</h2>
 
         <label className="block mb-2">Select Network</label>
         <select
@@ -71,7 +79,7 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
 
         <button
           onClick={handleSupply}
-          className="bg-blue-500 text-white w-full py-2 rounded"
+          className="bg-accent text-white w-full py-2 rounded"
         >
           Confirm Supply
         </button>
