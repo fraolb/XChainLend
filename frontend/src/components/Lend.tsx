@@ -7,6 +7,7 @@ import Avax from "@public/avax.png";
 import Base from "@public/base.png";
 import Optimism from "@public/optimism.png";
 import SupplyModal from "./modals/SupplyModal";
+import WithdrawSupplyModal from "./modals/WithdrawModal";
 
 type LendData = {
   lent: { asset: string; amount: number; apy: string; chain: string }[];
@@ -14,12 +15,22 @@ type LendData = {
 };
 
 interface ModalProps {
-  isModalOpen: boolean;
-  openModal: () => void;
-  closeModal: () => void;
+  isSupplyModalOpen: boolean;
+  openSupplyModal: () => void;
+  closeSupplyModal: () => void;
+  isWithdrawSupplyModalOpen: boolean;
+  openWithdrawSupplyModal: () => void;
+  closeWithdrawSupplyModal: () => void;
 }
 
-const Lend: React.FC<ModalProps> = ({ isModalOpen, openModal, closeModal }) => {
+const Lend: React.FC<ModalProps> = ({
+  isSupplyModalOpen,
+  openSupplyModal,
+  closeSupplyModal,
+  isWithdrawSupplyModalOpen,
+  openWithdrawSupplyModal,
+  closeWithdrawSupplyModal,
+}) => {
   const lendData: LendData = {
     lent: [{ asset: "USDC", amount: 1000, apy: "2.1%", chain: "Base" }],
     tokens: [
@@ -72,7 +83,10 @@ const Lend: React.FC<ModalProps> = ({ isModalOpen, openModal, closeModal }) => {
                     />
                   </td>
                   <td className="py-2 px-4 border-b border-gray-700">
-                    <button className="bg-accent text-white px-4 py-1 rounded">
+                    <button
+                      onClick={openWithdrawSupplyModal}
+                      className="bg-accent text-white px-4 py-1 rounded"
+                    >
                       Withdraw
                     </button>
                   </td>
@@ -102,7 +116,7 @@ const Lend: React.FC<ModalProps> = ({ isModalOpen, openModal, closeModal }) => {
                   </td>
                   <td className="py-2 px-4 border-b border-gray-700">
                     <button
-                      onClick={openModal}
+                      onClick={openSupplyModal}
                       className="bg-accent text-white px-4 py-1 rounded"
                     >
                       Supply
@@ -113,7 +127,11 @@ const Lend: React.FC<ModalProps> = ({ isModalOpen, openModal, closeModal }) => {
             </tbody>
           </table>
         </div>
-        <SupplyModal isOpen={isModalOpen} onClose={closeModal} />
+        <SupplyModal isOpen={isSupplyModalOpen} onClose={closeSupplyModal} />
+        <WithdrawSupplyModal
+          isOpen={isWithdrawSupplyModalOpen}
+          onClose={closeWithdrawSupplyModal}
+        />
       </section>
     </div>
   );
