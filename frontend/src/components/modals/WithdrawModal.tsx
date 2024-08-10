@@ -34,7 +34,7 @@ interface SupplyModalProps {
   onClose: () => void;
 }
 
-const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
+const WithdrawSupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   const activeChain = useActiveWalletChain();
   const switchChain = useSwitchActiveWalletChain();
   const [selectedChain, setSelectedChain] = useState(baseSepolia);
@@ -123,17 +123,6 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleNetworkChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedChainId = parseInt(e.target.value, 10);
-    const chain =
-      selectedChainId === baseSepolia.id
-        ? baseSepolia
-        : selectedChainId === optimismSepolia.id
-        ? optimismSepolia
-        : avalancheFuji;
-    setSelectedChain(chain);
-  };
-
   useEffect(() => {
     // const active = useActiveWalletChain();
     // setActiveNetwork(active);
@@ -153,18 +142,7 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
             x
           </button>
         </div>
-        <h2 className="text-xl font-bold mb-4 text-accent">Borrow Tokens</h2>
-
-        <label className="block mb-2">Select Network</label>
-        <select
-          className="w-full mb-4 p-2 border border-gray-300 rounded"
-          onChange={handleNetworkChange}
-          value={selectedChain.id}
-        >
-          <option value={baseSepolia.id}>Base Sepolia</option>
-          <option value={optimismSepolia.id}>Optimism</option>
-          <option value={avalancheFuji.id}>Avalanche Fuji</option>
-        </select>
+        <h2 className="text-xl font-bold mb-4 text-accent">Withdraw Supply</h2>
 
         <label className="block mb-2">Amount</label>
         <input
@@ -174,24 +152,16 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
           onChange={(e) => setAmount(e.target.value)}
           className="w-full mb-4 p-2 border border-gray-300 rounded"
         />
-        {activeChain?.id == selectedChain?.id ? (
-          <button
-            onClick={handleSupply}
-            className="bg-accent text-white w-full py-2 rounded"
-          >
-            Confirm Borrow
-          </button>
-        ) : (
-          <button
-            onClick={() => switchChain(selectedChain)}
-            className="bg-accent text-white w-full py-2 rounded"
-          >
-            Change Network
-          </button>
-        )}
+
+        <button
+          onClick={handleSupply}
+          className="bg-accent text-white w-full py-2 rounded"
+        >
+          Confirm Withdraw
+        </button>
       </div>
     </div>
   );
 };
 
-export default SupplyModal;
+export default WithdrawSupplyModal;

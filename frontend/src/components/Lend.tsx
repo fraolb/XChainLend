@@ -6,7 +6,7 @@ import Image from "next/image";
 import Avax from "@public/avax.png";
 import Base from "@public/base.png";
 import Optimism from "@public/optimism.png";
-import SupplyModal from "./SupplyModal";
+import SupplyModal from "./modals/SupplyModal";
 
 type LendData = {
   lent: { asset: string; amount: number; apy: string; chain: string }[];

@@ -153,7 +153,9 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
             x
           </button>
         </div>
-        <h2 className="text-xl font-bold mb-4 text-accent">Borrow Tokens</h2>
+        <h2 className="text-xl font-bold mb-4 text-accent">
+          Deposit Collateral Tokens
+        </h2>
 
         <label className="block mb-2">Select Network</label>
         <select
@@ -179,7 +181,7 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
             onClick={handleSupply}
             className="bg-accent text-white w-full py-2 rounded"
           >
-            Confirm Borrow
+            Deposit Collateral
           </button>
         ) : (
           <button
