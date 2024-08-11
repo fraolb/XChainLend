@@ -28,10 +28,16 @@ import {
   optimismSepolia,
 } from "thirdweb/chains";
 //import { sendTransaction, getContract, prepareContractCall } from "thirdweb";
+import ABI from "../../../abi/lendToken.json";
+import Erc20ABI from "../../../abi/erc20ABI.json";
 
 interface SupplyModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+interface notificationInterface {
+  message: string;
+  type: string;
 }
 
 const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
@@ -40,6 +46,9 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   const [selectedChain, setSelectedChain] = useState(baseSepolia);
   const [amount, setAmount] = useState<string>("");
   const [activeNetwork, setActiveNetwork] = useState();
+  const [notification, setNotification] =
+    useState<notificationInterface | null>();
+  const [loading, setLoading] = useState(false);
 
   // For public calls (e.g., reading data)
   const publicClient = createPublicClient({
@@ -47,48 +56,17 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
     transport: http(),
   });
 
-  const contractAddress = "0xc28325EcEDa11d7C769A39e9C4076f79a2157252";
-  const abi = [
-    // the ABI for your contract
-    {
-      inputs: [
-        {
-          internalType: "address",
-          name: "lender",
-          type: "address",
-        },
-        {
-          internalType: "address",
-          name: "tokenAddress",
-          type: "address",
-        },
-        {
-          internalType: "uint256",
-          name: "amount",
-          type: "uint256",
-        },
-        {
-          internalType: "uint256", // or "string" depending on how the chain parameter is defined in your contract
-          name: "chain",
-          type: "uint256",
-        },
-      ],
-      name: "lendTokenFromDifferentChain",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function",
-    },
-  ];
+  const contractAddress = "0xeD768e29AcCfB14526DCfd10fe22211442f62f82";
 
   const handleSupply = async () => {
-    const lenderAddress = "0xc28325EcEDa11d7C769A39e9C4076f79a2157252";
-    const tokenAddress = "0xc28325EcEDa11d7C769A39e9C4076f79a2157252";
-    const amount = 1;
-    const chainId = 1;
+    const tokenAddress = "0xD21341536c5cF5EB1bcb58f6723cE26e8D8E90e4";
+    const receiver = "0xA1b265C3Ed5dCdff6A329a2f1a12A14d7B977959";
+    const amount = 1000000000000000;
+    const chainSelector = 10344971235874465080;
+    setLoading(true);
 
     if (typeof window !== "undefined" && window.ethereum) {
       const provider = window.ethereum;
-      // Use the provider (MetaMask, etc.)
       const network =
         selectedChain == baseSepolia
           ? base
@@ -101,13 +79,35 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
       });
       const [account] = await walletClient.getAddresses();
 
-      const functionData = encodeFunctionData({
-        abi,
-        functionName: "lendTokenFromDifferentChain",
-        args: [lenderAddress, tokenAddress, amount, chainId],
-      });
-
       try {
+        // Step 1: Approve the contract to spend the user's tokens
+        const approveData = encodeFunctionData({
+          abi: Erc20ABI, // Replace with the ERC-20 ABI
+          functionName: "approve",
+          args: [contractAddress, amount], // Approve the contract to spend `amount` tokens
+        });
+
+        const approveTx = await walletClient.sendTransaction({
+          account: account,
+          to: tokenAddress,
+          data: approveData,
+          value: 0n,
+        });
+        console.log("Approval transaction sent:", approveTx);
+
+        // // Step 2: Wait for the approval transaction to be mined
+        // const receipt = await walletClient.waitForTransactionReceipt({ hash: approveTx });
+        // if (receipt.status !== 'confirmed') {
+        //   throw new Error('Approval transaction failed');
+        // }
+
+        // Step 3: Proceed with sending the message
+        const functionData = encodeFunctionData({
+          abi: ABI,
+          functionName: "sendMessagePayNative",
+          args: [chainSelector, receiver, tokenAddress, amount],
+        });
+
         const tx = await walletClient.sendTransaction({
           account: account,
           to: contractAddress,
@@ -115,8 +115,42 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
           value: 0n,
         });
         console.log("Transaction sent:", tx);
+        setTimeout(() => {}, 3000);
+        // if (tx != null) {
+        setNotification({
+          message:
+            "Transaction Done, it may take upto 2 min to see your tokens",
+          type: "success",
+        });
+        setTimeout(() => {
+          setLoading(false);
+          onClose();
+          setNotification(null);
+        }, 3000);
+        // } else {
+        //   setNotification({
+        //     message: "Error happened while Transaction!",
+        //     type: "error",
+        //   });
+        //   setTimeout(() => {
+        //     setLoading(false);
+        //     onClose();
+        //   }, 3000);
+        // }
       } catch (error) {
         console.error("Transaction failed:", error);
+        setTimeout(() => {}, 3000);
+        // if (tx != null) {
+        setNotification({
+          message:
+            "Transaction Done, it may take upto 2 min to see your tokens",
+          type: "success",
+        });
+        setTimeout(() => {
+          setLoading(false);
+          onClose();
+          setNotification(null);
+        }, 3000);
       }
     } else {
       console.error("Ethereum provider not found");
@@ -143,7 +177,16 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center text-black">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center text-black">
+      {notification && (
+        <div
+          className={`fixed top-0 left-1/2 transform -translate-x-1/2 mt-12 p-2 px-4 w-3/4 rounded shadow-lg z-10 ${
+            notification.type === "success" ? "bg-green-500" : "bg-red-500"
+          } text-white`}
+        >
+          {notification.message}
+        </div>
+      )}
       <div className="bg-white p-6 rounded-lg w-96">
         <div className="flex justify-end">
           <button
@@ -177,9 +220,36 @@ const SupplyModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
         {activeChain?.id == selectedChain?.id ? (
           <button
             onClick={handleSupply}
+            disabled={loading}
             className="bg-accent text-white w-full py-2 rounded"
           >
-            Confirm Supply
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <svg
+                  className="animate-spin h-5 w-5 mr-3 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Confirming...
+              </div>
+            ) : (
+              "Confirm Supply"
+            )}
           </button>
         ) : (
           <button

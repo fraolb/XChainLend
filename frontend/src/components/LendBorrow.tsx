@@ -53,10 +53,14 @@ const LendBorrow = () => {
 
   const borrowData: BorrowData = {
     borrowed: [
-      { asset: "USDC", amount: 50, apy: "4.2%", chain: "Base" },
-      { asset: "CCIP-BnM", amount: 1, apy: "5.0%", chain: "Avax" },
+      { asset: "USDC", amount: 5, apy: "4.2%", chain: "Base" },
+      // { asset: "CCIP-BnM", amount: 1, apy: "5.0%", chain: "Avax" },
+      { asset: "CCIP-BnM", amount: 0.002, apy: "5.0%", chain: "Base" },
     ],
-    collateral: [{ asset: "CCIP-BnM", amount: 2.5, chain: "Avax" }],
+    collateral: [
+      { asset: "CCIP-BnM", amount: 2.5, chain: "Avax" },
+      { asset: "CCIP-BnM", amount: 0.002, chain: "Optimism" },
+    ],
     tokens: [
       { asset: "CCIP-BnM", chains: ["Base", "Optmism", "Avax"] },
       { asset: "USDC", chains: ["Base", "Optmism", "Avax"] },
@@ -88,17 +92,11 @@ const LendBorrow = () => {
             </thead>
             <tbody>
               {borrowData.borrowed.map((token, index) => (
-                <tr key={index}>
-                  <td className="py-2 px-4 border-b border-gray-700">
-                    {token.asset}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
-                    {token.amount}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
-                    {token.apy}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
+                <tr key={index} className="border-b border-gray-700">
+                  <td className="py-2 px-4 ">{token.asset}</td>
+                  <td className="py-2 px-4 ">{token.amount}</td>
+                  <td className="py-2 px-4 ">{token.apy}</td>
+                  <td className="py-2 px-4">
                     <Image
                       src={
                         token.chain == "Avax"
@@ -111,7 +109,7 @@ const LendBorrow = () => {
                       className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
                     />
                   </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
+                  <td className="py-2 px-4 ">
                     <button className="bg-accent text-white px-4 py-1 rounded">
                       Pay Back
                     </button>
@@ -137,9 +135,6 @@ const LendBorrow = () => {
                   }
                   alt="Chain"
                   className="w-[40px] h-[40px] md:w-[40px] md:h-[40px]"
-                  style={{
-                    filter: "drop-shadow(0px 0px 24px #a726a9a8)",
-                  }}
                 />
               </div>
               <ConnectButton
@@ -174,14 +169,10 @@ const LendBorrow = () => {
             </thead>
             <tbody>
               {borrowData.collateral.map((token, index) => (
-                <tr key={index}>
-                  <td className="py-2 px-4 border-b border-gray-700">
-                    {token.asset}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
-                    {token.amount}
-                  </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
+                <tr key={index} className="border-b border-gray-700">
+                  <td className="py-2 px-4 ">{token.asset}</td>
+                  <td className="py-2 px-4 ">{token.amount}</td>
+                  <td className="py-2 px-4 ">
                     <Image
                       src={
                         token.chain == "Avax"
@@ -194,7 +185,7 @@ const LendBorrow = () => {
                       className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
                     />
                   </td>
-                  <td className="py-2 px-4 border-b border-gray-700">
+                  <td className="py-2 px-4 ">
                     <button
                       className="bg-accent text-white px-4 py-1 rounded"
                       onClick={() => openWithdrawModal()}
@@ -227,11 +218,9 @@ const LendBorrow = () => {
           </thead>
           <tbody>
             {borrowData.tokens.map((token, index) => (
-              <tr key={index}>
-                <td className="py-2 px-4 border-b border-gray-700">
-                  {token.asset}
-                </td>
-                <td className="py-2 px-4 flex border-b border-gray-700">
+              <tr key={index} className="border-b border-gray-700">
+                <td className="py-2 px-4 ">{token.asset}</td>
+                <td className="py-2 px-4 flex ">
                   {token.chains.map((i) => (
                     <Image
                       src={i == "Avax" ? Avax : i == "Base" ? Base : Optimism}
@@ -240,7 +229,7 @@ const LendBorrow = () => {
                     />
                   ))}
                 </td>
-                <td className="py-2 px-4 border-b border-gray-700">
+                <td className="py-2 px-4 ">
                   <button
                     className="bg-accent text-white px-4 py-1 rounded"
                     onClick={() => openDepositModal()}
@@ -248,7 +237,7 @@ const LendBorrow = () => {
                     Deposit Collateral
                   </button>
                 </td>
-                <td className="py-2 px-4 border-b border-gray-700">
+                <td className="py-2 px-4 ">
                   <button
                     className="bg-accent text-white px-4 py-1 rounded"
                     onClick={() => openBorrowModal()}

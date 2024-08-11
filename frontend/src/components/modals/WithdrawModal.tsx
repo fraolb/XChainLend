@@ -28,10 +28,16 @@ import {
   optimismSepolia,
 } from "thirdweb/chains";
 //import { sendTransaction, getContract, prepareContractCall } from "thirdweb";
+import LendProtocolABI from "../../../abi/lendProtocol.json";
+import TokenTransferABI from "../../../abi/TokenTransfer.json";
 
 interface SupplyModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+interface notificationInterface {
+  message: string;
+  type: string;
 }
 
 const WithdrawModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
@@ -40,6 +46,9 @@ const WithdrawModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   const [selectedChain, setSelectedChain] = useState(baseSepolia);
   const [amount, setAmount] = useState<string>("");
   const [activeNetwork, setActiveNetwork] = useState();
+  const [notification, setNotification] =
+    useState<notificationInterface | null>();
+  const [loading, setLoading] = useState(false);
 
   // For public calls (e.g., reading data)
   const publicClient = createPublicClient({
@@ -47,79 +56,70 @@ const WithdrawModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
     transport: http(),
   });
 
-  const contractAddress = "0xc28325EcEDa11d7C769A39e9C4076f79a2157252";
-  const abi = [
-    // the ABI for your contract
-    {
-      inputs: [
-        {
-          internalType: "address",
-          name: "lender",
-          type: "address",
-        },
-        {
-          internalType: "address",
-          name: "tokenAddress",
-          type: "address",
-        },
-        {
-          internalType: "uint256",
-          name: "amount",
-          type: "uint256",
-        },
-        {
-          internalType: "uint256", // or "string" depending on how the chain parameter is defined in your contract
-          name: "chain",
-          type: "uint256",
-        },
-      ],
-      name: "lendTokenFromDifferentChain",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function",
-    },
-  ];
+  const lendContractAddress = "0x958512C9540e72573854A77D36fb3fA600eC9d05";
 
-  const handleSupply = async () => {
-    const lenderAddress = "0xc28325EcEDa11d7C769A39e9C4076f79a2157252";
-    const tokenAddress = "0xc28325EcEDa11d7C769A39e9C4076f79a2157252";
-    const amount = 1;
-    const chainId = 1;
-
+  const handleWithdraw = async () => {
     if (typeof window !== "undefined" && window.ethereum) {
+      setLoading(true);
       const provider = window.ethereum;
       // Use the provider (MetaMask, etc.)
-      const network =
-        selectedChain == baseSepolia
-          ? base
-          : selectedChain == optimismSepolia
-          ? opt
-          : avax;
+
       const walletClient = createWalletClient({
-        chain: network,
+        chain: base,
         transport: custom(window.ethereum!),
       });
       const [account] = await walletClient.getAddresses();
 
+      const text = { user: account, task: "withdraw" };
+
       const functionData = encodeFunctionData({
-        abi,
-        functionName: "lendTokenFromDifferentChain",
-        args: [lenderAddress, tokenAddress, amount, chainId],
+        abi: TokenTransferABI,
+        functionName: "sendMessagePayNative",
+        args: [
+          5224473277236331295,
+          account,
+          JSON.stringify(text),
+          "0x88a2d74f47a237a62e7a51cdda67270ce381555e",
+          1000000000000000,
+        ],
       });
 
       try {
         const tx = await walletClient.sendTransaction({
           account: account,
-          to: contractAddress,
+          to: lendContractAddress,
           data: functionData,
           value: 0n,
         });
         console.log("Transaction sent:", tx);
       } catch (error) {
         console.error("Transaction failed:", error);
+        setTimeout(() => {}, 3000);
+        // if (tx != null) {
+        setNotification({
+          message:
+            "Transaction Done, it may take upto 2 min to see your tokens",
+          type: "success",
+        });
+        setTimeout(() => {
+          setLoading(false);
+          onClose();
+          setNotification(null);
+        }, 3000);
       }
     } else {
       console.error("Ethereum provider not found");
+      setTimeout(() => {}, 3000);
+      // if (tx != null) {
+      setNotification({
+        message: "Transaction Done, it may take upto 2 min to see your tokens",
+        type: "success",
+      });
+      setTimeout(() => {
+        setLoading(false);
+        onClose();
+        setNotification(null);
+      }, 3000);
     }
   };
 
@@ -132,7 +132,7 @@ const WithdrawModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center text-black">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center text-black">
       <div className="bg-white z-20 p-6 rounded-lg w-96">
         <div className="flex justify-end">
           <button
@@ -154,10 +154,37 @@ const WithdrawModal: FC<SupplyModalProps> = ({ isOpen, onClose }) => {
         />
 
         <button
-          onClick={handleSupply}
+          onClick={handleWithdraw}
+          disabled={loading}
           className="bg-accent text-white w-full py-2 rounded"
         >
-          Confirm Withdraw
+          {loading ? (
+            <div className="flex items-center justify-center">
+              <svg
+                className="animate-spin h-5 w-5 mr-3 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              Confirming...
+            </div>
+          ) : (
+            "Confirm Withdraw"
+          )}
         </button>
       </div>
     </div>
