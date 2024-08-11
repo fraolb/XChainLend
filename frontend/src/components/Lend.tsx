@@ -157,6 +157,7 @@ const Lend: React.FC<ModalProps> = ({
                   <td className="py-2 flex px-4 ">
                     {token.chains.map((i) => (
                       <Image
+                        key={i}
                         src={i == "Avax" ? Avax : i == "Base" ? Base : Optimism}
                         alt="Chain"
                         className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"

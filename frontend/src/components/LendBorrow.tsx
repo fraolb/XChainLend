@@ -223,6 +223,7 @@ const LendBorrow = () => {
                 <td className="py-2 px-4 flex ">
                   {token.chains.map((i) => (
                     <Image
+                      key={i}
                       src={i == "Avax" ? Avax : i == "Base" ? Base : Optimism}
                       alt="Chain"
                       className="w-[30px] h-[30px] md:w-[30px] md:h-[30px]"
