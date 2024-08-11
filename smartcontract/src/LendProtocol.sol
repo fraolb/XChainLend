@@ -16,6 +16,11 @@ import {SafeERC20} from
     "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./library/Math.sol";
 
+/*
+     * @notice This is XChain lend protocol
+     * It takes tokens from mulitple chains using chainlink ccip
+     * built on ETH hackathon
+     */
 contract LendProtocol is CCIPReceiver, OwnerIsCreator {
     using Math for uint256;
     using SafeERC20 for IERC20;
